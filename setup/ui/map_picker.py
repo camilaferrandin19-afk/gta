@@ -32,6 +32,7 @@ from ..core.models import StoryPackage
 
 MAP_SCALE = 0.08
 ISLAND_MARGIN = 12.0
+MAX_ZOOM_FACTOR = 8.0
 CORNER_RE = re.compile(r'^(RUA-\d+)\s*[xX×]\s*(RUA-\d+)(?:\s+(NO|NE|SO|SE))?$', re.IGNORECASE)
 
 KIND_COLORS = {
@@ -68,22 +69,20 @@ class _SelectableMapRect(QGraphicsRectItem):
 
 
 class _ZoomableMapView(QGraphicsView):
-    def __init__(self, scene: QGraphicsScene, on_manual_zoom: Callable[[], None] | None = None, parent: QWidget | None = None) -> None:
+    def __init__(self, scene: QGraphicsScene, on_zoom: Callable[[float], None] | None = None, parent: QWidget | None = None) -> None:
         super().__init__(scene, parent)
-        self._on_manual_zoom = on_manual_zoom
+        self._on_zoom = on_zoom
         self.setRenderHint(QPainter.RenderHint.Antialiasing, True)
         self.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
         self.setResizeAnchor(QGraphicsView.ViewportAnchor.AnchorViewCenter)
 
     def wheelEvent(self, event: QWheelEvent) -> None:
         if event.angleDelta().y() > 0:
-            if self._on_manual_zoom:
-                self._on_manual_zoom()
-            self.scale(1.18, 1.18)
+            if self._on_zoom:
+                self._on_zoom(1.18)
         elif event.angleDelta().y() < 0:
-            if self._on_manual_zoom:
-                self._on_manual_zoom()
-            self.scale(1 / 1.18, 1 / 1.18)
+            if self._on_zoom:
+                self._on_zoom(1 / 1.18)
         else:
             super().wheelEvent(event)
 
@@ -110,6 +109,7 @@ class CityMapCanvas(QWidget):
         self._selected_code = ''
         self._items_by_code: dict[str, _SelectableMapRect] = {}
         self._auto_fit = True
+        self._min_scale = 1.0
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -165,16 +165,21 @@ class CityMapCanvas(QWidget):
         layout.addLayout(top_bar)
 
         self.scene = QGraphicsScene(self)
-        self.view = _ZoomableMapView(self.scene, on_manual_zoom=self._disable_auto_fit, parent=self)
+        self.view = _ZoomableMapView(self.scene, on_zoom=self._zoom_by, parent=self)
         self.view.setBackgroundBrush(QBrush(QColor('#0f2942')))
         layout.addWidget(self.view, 1)
 
-    def _disable_auto_fit(self) -> None:
-        self._auto_fit = False
-
     def _zoom_by(self, factor: float) -> None:
         self._auto_fit = False
-        self.view.scale(factor, factor)
+        cur = max(1e-6, self.view.transform().m11())
+        min_s = max(1e-6, self._min_scale)
+        max_s = min_s * MAX_ZOOM_FACTOR
+        target = max(min_s, min(max_s, cur * factor))
+        actual = target / cur
+        if abs(actual - 1.0) > 1e-6:
+            self.view.scale(actual, actual)
+        if target <= min_s + 1e-6 and not self.scene.sceneRect().isEmpty():
+            self.view.centerOn(self.scene.sceneRect().center())
 
     def showEvent(self, event: QShowEvent) -> None:
         super().showEvent(event)
@@ -327,12 +332,10 @@ class CityMapCanvas(QWidget):
     def fit_all(self) -> None:
         self._auto_fit = True
         if not self.scene.sceneRect().isEmpty():
-            self.view.fitInView(self.scene.sceneRect(), Qt.AspectRatioMode.KeepAspectRatioByExpanding)
+            self.view.fitInView(self.scene.sceneRect(), Qt.AspectRatioMode.KeepAspectRatio)
+            self._min_scale = max(1e-6, self.view.transform().m11())
             if self._selected_code:
                 self.focus_code(self._selected_code)
-            else:
-                self.view.horizontalScrollBar().setValue(self.view.horizontalScrollBar().minimum())
-                self.view.verticalScrollBar().setValue(self.view.verticalScrollBar().minimum())
 
     def focus_code(self, code: str) -> None:
         raw = (code or '').strip()
