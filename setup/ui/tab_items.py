@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
 
 from ..core.models import Item, StoryPackage
 from ..core.validator import find_dependents
+from .map_picker import LocationPickerField
 from .widgets import AssetPickerRow
 
 
@@ -33,11 +34,13 @@ class ItemsTab(QWidget):
 
     def __init__(
         self,
+        app_root: Path,
         story_dir_provider: Callable[[], Path | None],
         on_data_changed: Callable[[], None] | None = None,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
+        self._app_root = app_root
         self._pkg: StoryPackage | None = None
         self._current_id: str | None = None
         self._on_data_changed = on_data_changed
@@ -76,6 +79,12 @@ class ItemsTab(QWidget):
         self.category_combo.addItems(['missao', 'extra'])
         self.rarity_edit = QLineEdit()
         self.rarity_edit.setPlaceholderText('Opcional (ex.: comum, raro, épico)')
+        self.location_picker = LocationPickerField(
+            self._app_root,
+            lambda: self._pkg,
+            allow_clear=True,
+            on_changed=lambda _: self._sync(),
+        )
         self.image_picker = AssetPickerRow(story_dir_provider, subdir='assets', on_changed=lambda _: self._sync())
 
         form.addRow('ID:', self.id_edit)
@@ -83,6 +92,7 @@ class ItemsTab(QWidget):
         form.addRow('Descrição:', self.desc_edit)
         form.addRow('Categoria:', self.category_combo)
         form.addRow('Raridade:', self.rarity_edit)
+        form.addRow('Local no mapa (extra):', self.location_picker)
         form.addRow('Imagem:', self.image_picker)
 
         splitter.addWidget(left_panel)
@@ -123,6 +133,7 @@ class ItemsTab(QWidget):
         self.name_edit.clear()
         self.desc_edit.clear()
         self.rarity_edit.clear()
+        self.location_picker.set_code('')
         self.image_picker.set_value('')
 
     def _on_selected(self, current: QListWidgetItem | None) -> None:
@@ -138,6 +149,7 @@ class ItemsTab(QWidget):
         self.desc_edit.setText(item.description)
         self.category_combo.setCurrentText(item.category if item.category in ('missao', 'extra') else 'missao')
         self.rarity_edit.setText(item.rarity)
+        self.location_picker.set_code(item.location)
         self.image_picker.set_value(item.image)
         self._current_id = iid
 
@@ -151,6 +163,7 @@ class ItemsTab(QWidget):
         item.description = self.desc_edit.text().strip()
         item.category = self.category_combo.currentText()
         item.rarity = self.rarity_edit.text().strip()
+        item.location = self.location_picker.code()
         item.image = self.image_picker.value()
         list_item = self.item_list.currentItem()
         if list_item:

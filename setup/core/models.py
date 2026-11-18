@@ -34,6 +34,7 @@ class Item:
     name: str
     description: str = ''
     image: str = ''
+    location: str = ''
     category: str = 'missao'
     rarity: str = ''
 

@@ -96,7 +96,7 @@ class SetupMainWindow(QMainWindow):
         self.tabs = QTabWidget()
         self.tab_story = StoryMetadataTab(self._current_story_dir)
         self.tab_characters = CharactersTab(self._current_story_dir, on_data_changed=self._on_refs_changed)
-        self.tab_items = ItemsTab(self._current_story_dir, on_data_changed=self._on_refs_changed)
+        self.tab_items = ItemsTab(self.app_root, self._current_story_dir, on_data_changed=self._on_refs_changed)
         self.tab_missions = MissionsAndEncountersTab(self.app_root, on_data_changed=self._mark_dirty)
         self.tab_map = MapLocationsTab(self.app_root, self._current_story_dir, on_data_changed=self._mark_dirty)
 

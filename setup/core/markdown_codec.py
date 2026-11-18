@@ -158,6 +158,7 @@ def parse_item_markdown(raw_text: str, file_name: str) -> Item:
         name=meta.get('name', '').strip(),
         description=meta.get('description', '').strip(),
         image=meta.get('image', '').strip(),
+        location=meta.get('location', '').strip(),
         category=(meta.get('category', 'missao') or 'missao').strip().lower(),
         rarity=meta.get('rarity', '').strip(),
     )
@@ -169,6 +170,7 @@ def serialize_item_markdown(item: Item) -> str:
         ('name', item.name),
         ('description', item.description),
         ('image', item.image),
+        ('location', item.location),
         ('category', item.category or 'missao'),
     ]
     if item.rarity:
