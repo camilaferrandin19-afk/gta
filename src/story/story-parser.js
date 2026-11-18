@@ -495,3 +495,57 @@ export function replaceLocationCodesWithNames(text, locationNames) {
     return resolved || match;
   });
 }
+
+const STORY_ID_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+export function parseStoryCatalog(rawText, fileName = 'stories.json') {
+  let parsed;
+  try {
+    parsed = JSON.parse(String(rawText || ''));
+  } catch {
+    throw new StoryParseError(fileName, 1, 'JSON inválido no catálogo de histórias.');
+  }
+
+  if (!parsed || !Array.isArray(parsed.stories) || parsed.stories.length === 0) {
+    throw new StoryParseError(fileName, 1, 'O catálogo deve conter uma lista não vazia em "stories".');
+  }
+
+  const seenIds = new Set();
+  return parsed.stories.map((entry, idx) => {
+    if (!entry || typeof entry !== 'object') {
+      throw new StoryParseError(fileName, idx + 1, 'Entrada de história inválida no catálogo.');
+    }
+    const id = String(entry.id || '').trim();
+    if (!STORY_ID_RE.test(id)) {
+      throw new StoryParseError(
+        fileName,
+        idx + 1,
+        `Identificador de história inválido "${id}". Use apenas letras minúsculas, números e hífen.`,
+      );
+    }
+    if (seenIds.has(id)) {
+      throw new StoryParseError(fileName, idx + 1, `Identificador de história duplicado "${id}".`);
+    }
+    seenIds.add(id);
+
+    const title = String(entry.title || '').trim();
+    if (!title) {
+      throw new StoryParseError(fileName, idx + 1, `História "${id}" sem título ("title").`);
+    }
+
+    const rawPath = String(entry.path || `./story/${id}`).trim();
+    const safeRelPath = validateAssetPath(rawPath, fileName, idx + 1);
+    const normalizedPath = `./${safeRelPath.replace(/\/+$/, '')}`;
+
+    const rawCover = String(entry.cover || '').trim();
+    const safeCover = rawCover ? `./${validateAssetPath(rawCover, fileName, idx + 1)}` : '';
+
+    return {
+      id,
+      title,
+      description: String(entry.description || '').trim(),
+      cover: safeCover,
+      path: normalizedPath,
+    };
+  });
+}

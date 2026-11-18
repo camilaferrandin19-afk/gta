@@ -12,6 +12,7 @@ import {
   formatContinueLabel
 } from './core/save-state.js?v=2';
 import {
+  loadStoryCatalog,
   loadStorySplashHeader,
   loadStoryPackage,
   markAssetLoaded,
@@ -40,14 +41,18 @@ async function boot() {
   const minimapCanvas = document.getElementById('minimap-canvas');
   const touchControls = document.getElementById('touch-controls');
 
+  let storyCatalog = [];
+  let selectedStory = null;
   let storyPackage = null;
   let cityMap = null;
   let activeEngine = null;
   let savedState = null;
   const preloadedUrls = new Set();
 
+  const getStoryKey = () => selectedStory?.id || storyPackage?.title || 'default';
+
   const refreshStartButtons = () => {
-    const storyKey = storyPackage?.title || 'default';
+    const storyKey = getStoryKey();
     savedState = loadGameState(storyKey);
     hud.setStartButtonState({
       label: formatContinueLabel(savedState),
@@ -56,8 +61,14 @@ async function boot() {
   };
 
   try {
+    hud.showLoading(10, 'Lendo catálogo de histórias...');
+    storyCatalog = await loadStoryCatalog('./story/stories.json');
+    const urlStoryId = new URLSearchParams(window.location.search).get('story');
+    selectedStory = (urlStoryId && storyCatalog.find((s) => s.id === urlStoryId)) || storyCatalog[0];
+    const storyBasePath = selectedStory.path;
+
     hud.showLoading(15, 'Lendo abertura da história...');
-    const splashHeader = await loadStorySplashHeader('./story');
+    const splashHeader = await loadStorySplashHeader(storyBasePath);
 
     if (splashHeader.splashUrl) {
       hud.showLoading(60, 'Carregando tela inicial...');
@@ -86,7 +97,7 @@ async function boot() {
     cityMap = new CityMap();
 
     hud.setStartLoadingProgress(12, 'Carregando dados da história e missões...', { ready: false });
-    storyPackage = await loadStoryPackage('./story', cityMap, {
+    storyPackage = await loadStoryPackage(storyBasePath, cityMap, {
       prefetchedManifest: splashHeader.manifest,
       prefetchedSplashUrl: splashHeader.splashUrl,
       prefetchedFaviconUrl: splashHeader.faviconUrl,
@@ -192,14 +203,15 @@ async function boot() {
         activeEngine.stop();
       }
       if (!useSaved) {
-        clearGameState();
+        clearGameState(getStoryKey());
         savedState = null;
       } else {
-        savedState = loadGameState(storyPackage?.title || 'default');
+        savedState = loadGameState(getStoryKey());
       }
       activeEngine = new Engine(canvas, minimapCanvas, touchControls, hud, {
         cityMap,
         storyPackage,
+        storyKey: getStoryKey(),
         cutscene,
         pauseMenu,
         inventoryController,

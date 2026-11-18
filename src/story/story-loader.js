@@ -8,6 +8,7 @@ import {
   replaceLocationCodesWithNames,
   validateAssetPath,
   StoryParseError,
+  parseStoryCatalog,
 } from './story-parser.js?v=17';
 
 async function fetchText(url, label, options = {}) {
@@ -239,6 +240,15 @@ export async function resolveStoryFaviconUrl(basePath = './story', existsFn = ch
   ];
   const found = await resolveFirstExistingAsset(candidates, existsFn);
   return found || './icon.svg';
+}
+
+export function shouldShowStorySelector(stories = []) {
+  return Array.isArray(stories) && stories.length >= 2;
+}
+
+export async function loadStoryCatalog(catalogUrl = './story/stories.json') {
+  const raw = await fetchText(catalogUrl, 'stories.json');
+  return parseStoryCatalog(raw, 'stories.json');
 }
 
 export async function loadStorySplashHeader(basePath = './story') {
