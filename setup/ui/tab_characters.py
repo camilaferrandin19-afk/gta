@@ -86,12 +86,9 @@ class CharactersTab(QWidget):
         self.skin_edit.setMaximumWidth(110)
         self.skin_pick_btn = QPushButton('Cor...')
         self.skin_pick_btn.clicked.connect(self._on_pick_skin_color)
-        self.skin_default_btn = QPushButton('Bege padrão')
-        self.skin_default_btn.clicked.connect(lambda: self._set_skin_color('#f1c27d', sync=True))
         skin_row.addWidget(self.skin_swatch)
         skin_row.addWidget(self.skin_edit)
         skin_row.addWidget(self.skin_pick_btn)
-        skin_row.addWidget(self.skin_default_btn)
         skin_row.addStretch(1)
 
         self.top_picker = AssetPickerRow(story_dir_provider, subdir='assets', on_changed=lambda _: self._sync())
