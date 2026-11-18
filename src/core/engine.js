@@ -1965,15 +1965,17 @@ export class Engine {
       });
       this.setObjective(activeMission.targetLocation);
       this.#persistSaveState();
-    } else if (this.#isNearPendingTargetNpc() && input.actionJustPressed) {
-      const itemDef = this.storyPackage?.items?.get(activeMission.giveItem);
-      const itemName = itemDef?.name || activeMission.giveItem || 'o item';
-      const pickupName = this.locationNames.get(activeMission.pickupLocation) || activeMission.pickupLocation;
-      const hintMsg = activeMission.pickupObjective || `Você ainda não pegou ${itemName}! Vá até ${pickupName} primeiro.`;
-      this.hud.showToast(hintMsg, {
-        imageUrl: itemDef?.imageUrl || '',
-        imageAlt: itemName
-      });
+    } else if (this.#isPickupStageActive()) {
+      if (this.#isNearPendingTargetNpc() && input.actionJustPressed) {
+        const itemDef = this.storyPackage?.items?.get(activeMission.giveItem);
+        const itemName = itemDef?.name || activeMission.giveItem || 'o item';
+        const pickupName = this.locationNames.get(activeMission.pickupLocation) || activeMission.pickupLocation;
+        const hintMsg = activeMission.pickupObjective || `Você ainda não pegou ${itemName}! Vá até ${pickupName} primeiro.`;
+        this.hud.showToast(hintMsg, {
+          imageUrl: itemDef?.imageUrl || '',
+          imageAlt: itemName
+        });
+      }
     } else {
       const requiresBuildingEntry =
         this.objectiveLocationType === 'commerce' || this.objectiveLocationType === 'house';
