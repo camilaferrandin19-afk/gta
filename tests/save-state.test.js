@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   SAVE_STORAGE_KEY,
+  getSaveStorageKey,
   createSaveSnapshot,
   saveGameState,
   loadGameState,
@@ -36,7 +37,7 @@ test('salva, carrega e limpa estado do jogo e inventário com escopo por histór
   });
 
   assert.equal(saveGameState(snapshot, storage), true);
-  assert.ok(storage.getItem(SAVE_STORAGE_KEY));
+  assert.ok(storage.getItem(getSaveStorageKey('Missão Vibe Coding')));
 
   const loaded = loadGameState('Missão Vibe Coding', storage);
   assert.ok(loaded);
@@ -48,7 +49,7 @@ test('salva, carrega e limpa estado do jogo e inventário com escopo por histór
   assert.equal(loaded.player.health, 87);
 
   assert.equal(loadGameState('Outra História', storage), null);
-  assert.equal(clearGameState(storage), true);
+  assert.equal(clearGameState('Missão Vibe Coding', storage), true);
   assert.equal(loadGameState('Missão Vibe Coding', storage), null);
 });
 
@@ -80,6 +81,7 @@ test('persiste missões desbloqueadas e mantém apenas a primeira missão no nov
   assert.deepEqual(loadedProgressed.unlockedMissionIndices, [0, 1]);
 
   // Save antigo sem campo unlockedMissionIndices mantém missões até currentMissionIndex
+  clearGameState('Missão Vibe Coding', storage);
   storage.setItem(SAVE_STORAGE_KEY, JSON.stringify({
     version: 1,
     storyKey: 'Missão Vibe Coding',

@@ -1,5 +1,9 @@
 export const SAVE_STORAGE_KEY = 'gta-cv-save-v1';
 
+export function getSaveStorageKey(storyKey = 'default') {
+  return `${SAVE_STORAGE_KEY}:${String(storyKey || 'default')}`;
+}
+
 function getDefaultStorage() {
   if (typeof window !== 'undefined' && window.localStorage) {
     return window.localStorage;
@@ -86,7 +90,8 @@ export function createSaveSnapshot({
 export function saveGameState(snapshot, storage = getDefaultStorage()) {
   if (!storage || !snapshot) return false;
   try {
-    storage.setItem(SAVE_STORAGE_KEY, JSON.stringify(snapshot));
+    const key = getSaveStorageKey(snapshot.storyKey);
+    storage.setItem(key, JSON.stringify(snapshot));
     return true;
   } catch {
     return false;
@@ -96,7 +101,8 @@ export function saveGameState(snapshot, storage = getDefaultStorage()) {
 export function loadGameState(storyKey = 'default', storage = getDefaultStorage()) {
   if (!storage) return null;
   try {
-    const raw = storage.getItem(SAVE_STORAGE_KEY);
+    const scopedKey = getSaveStorageKey(storyKey);
+    const raw = storage.getItem(scopedKey) || storage.getItem(SAVE_STORAGE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (!parsed || parsed.version !== 1) return null;
@@ -141,10 +147,19 @@ export function loadGameState(storyKey = 'default', storage = getDefaultStorage(
   }
 }
 
-export function clearGameState(storage = getDefaultStorage()) {
-  if (!storage) return false;
+export function clearGameState(storyKeyOrStorage = 'default', maybeStorage = undefined) {
+  let storyKey = 'default';
+  let storage = maybeStorage;
+  if (storyKeyOrStorage && typeof storyKeyOrStorage === 'object' && typeof storyKeyOrStorage.removeItem === 'function') {
+    storage = storyKeyOrStorage;
+  } else {
+    storyKey = String(storyKeyOrStorage || 'default');
+  }
+  const targetStorage = storage ?? getDefaultStorage();
+  if (!targetStorage) return false;
   try {
-    storage.removeItem(SAVE_STORAGE_KEY);
+    targetStorage.removeItem(getSaveStorageKey(storyKey));
+    targetStorage.removeItem(SAVE_STORAGE_KEY);
     return true;
   } catch {
     return false;

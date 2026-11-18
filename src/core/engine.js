@@ -51,6 +51,7 @@ export class Engine {
 
     this.cityMap = options.cityMap || null;
     this.storyPackage = options.storyPackage || null;
+    this.storyKey = options.storyKey || this.storyPackage?.title || 'default';
     this.locationNames = this.storyPackage?.locationNames || new Map();
     this.cutscene = options.cutscene || null;
     this.pauseMenu = options.pauseMenu || null;
@@ -234,7 +235,7 @@ export class Engine {
   #persistSaveState() {
     if (!this.storyPackage || this.player?.isDead || this.deathSequence) return;
     const snapshot = createSaveSnapshot({
-      storyKey: this.storyPackage.title || 'default',
+      storyKey: this.storyKey || this.storyPackage.title || 'default',
       currentMissionIndex: this.currentMissionIndex,
       unlockedMissionIndices: [...this.unlockedMissionIndices],
       freeRoamMode: this.freeRoamMode,
