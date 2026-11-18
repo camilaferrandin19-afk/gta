@@ -153,3 +153,19 @@ Este projeto foi idealizado e criado por **Gustavo Guanabara**, professor e fund
 O objetivo do **GTA — Guanabara Testando Agentes** vai muito além do jogo: ele existe para **incentivar pessoas de todas as idades a aprenderem a desenvolver soluções reais**, mostrando na prática como tecnologia, criatividade, lógica e ferramentas modernas podem caminhar juntas. O **Curso em Vídeo** tem como missão democratizar o ensino de tecnologia em língua portuguesa e **formar a próxima geração de desenvolvedores do mercado**.
 
 Curtiu o projeto? Faça um **fork**, crie sua própria história em [`story/`](./story), compartilhe com a comunidade e continue aprendendo!
+
+---
+
+## Histórico de versões
+
+### `v1.5` — Instaladores, Lançadores e Desinstalador Multiplataforma do Setup (2026-11-18)
+- Adicionado instalador multiplataforma [`setup/install.py`](./setup/install.py) para criar o ambiente virtual isolado (`.venv`) e instalar o `PySide6`.
+- Adicionado desinstalador [`setup/uninstall.py`](./setup/uninstall.py) para remover `.venv` e caches do Setup sem alterar o Python do sistema.
+- Criados lançadores de duplo clique identificados por sistema operacional (`install-win.bat`, `setup-gta-win.bat`, `uninstall-win.bat`; `install-mac.command`, `setup-gta-mac.command`, `uninstall-mac.command`; `install-lnx.sh`, `setup-gta-lnx.sh`, `uninstall-lnx.sh`), com verificação da pasta do projeto, checagem de dependências, oferta de instalação `S/N` e pausa em caso de erro.
+- Documentação atualizada em `README.md` e `setup/README.md`.
+
+### `v1.0` — Múltiplas Histórias, Aplicação Desktop Setup e Placeholders Ricos (2026-11-18)
+- **Motor e Cidade-Base:** ilha procedural 30×30 com códigos padronizados em **3 dígitos** (`CASA-001`, `RUA-001`, `COM-001`, `PRACA-001`, `HOSP-001`), interiores térreos com telhados personalizáveis (`roof_color`, `roof_logo`), tráfego em mão dupla, semáforos, pedestres com balões HQ, veículos com drift e explosões, inventário paginado com raridades e controles unificados para teclado, joystick e toque (retrato e paisagem).
+- **Múltiplas Histórias:** organização das campanhas em subpastas (`story/vibe-coding/`, catálogo `story/stories.json`), seletor de histórias na abertura, opção **Trocar de história** no menu de pausa e progresso salvo isolado por história.
+- **Narrativa e Formatação:** suporte a cutscenes em visão lateral com retratos PNG em `assets/` (`sprite_cutscene`), encontros extras fixos em construções, botão de link externo com janela web embutida, placeholders entre colchetes (`[CASA-001]`, `[ITEM-id]`, `[Personagem]`) destacados automaticamente em negrito e sublinhado, e formatação `**negrito**`, `*itálico*` e `__sublinhado__`.
+- **Aplicação Desktop `setup/`:** editor gráfico em Python + PySide6 com tema nas cores do jogo, modelo não editável [`story/_template/`](./story/_template), seletor visual de locais no mapa clicável, listas fechadas para personagens/itens, validação de integridade referencial e botão **Testar no Navegador**.
