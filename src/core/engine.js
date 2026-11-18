@@ -854,6 +854,38 @@ export class Engine {
     );
   }
 
+  #getMissionTargetNpcPoint() {
+    const activeMission = this.storyPackage?.missions?.[this.currentMissionIndex];
+    if (!activeMission?.targetLocation || !this.cityMap) return null;
+    if (this._cachedTargetNpcMissionId === activeMission.id && this._cachedTargetNpcPoint !== undefined) {
+      return this._cachedTargetNpcPoint;
+    }
+    let pt = null;
+    try {
+      const target = this.cityMap.resolveLocationCode(activeMission.targetLocation);
+      if ((target.type === 'commerce' || target.type === 'house') && target.bounds) {
+        pt = {
+          x: target.bounds.x + target.bounds.w * 0.5,
+          y: target.bounds.y + target.bounds.h * 0.55
+        };
+      }
+    } catch {
+      pt = null;
+    }
+    this._cachedTargetNpcMissionId = activeMission.id;
+    this._cachedTargetNpcPoint = pt;
+    return pt;
+  }
+
+  #isNearPendingTargetNpc() {
+    if (this.player.inVehicleId || !this.#isPickupStageActive()) return false;
+    const activeMission = this.storyPackage?.missions?.[this.currentMissionIndex];
+    if (!activeMission || this.player.insideLocationCode !== activeMission.targetLocation) return false;
+    const pt = this.#getMissionTargetNpcPoint();
+    if (!pt) return false;
+    return Math.hypot(this.player.x - pt.x, this.player.y - pt.y) < 58;
+  }
+
   #isNearInteriorStoryNpc() {
     if (this.player.inVehicleId || this.#isPickupStageActive() || !this.objectiveNpcPoint) return false;
     const requiresBuildingEntry =
@@ -871,6 +903,9 @@ export class Engine {
     const npcs = [...(this.completedNpcPoints || []), ...(this.encounterNpcs || [])];
     if (!this.#isPickupStageActive() && !this.missionOutTriggered && !this.freeRoamMode && this.objectiveNpcPoint) {
       npcs.push(this.objectiveNpcPoint);
+    } else if (this.#isPickupStageActive() && !this.missionOutTriggered && !this.freeRoamMode) {
+      const pendingNpc = this.#getMissionTargetNpcPoint();
+      if (pendingNpc) npcs.push(pendingNpc);
     }
     if (npcs.length === 0) return;
 
@@ -1411,7 +1446,7 @@ export class Engine {
         } else {
           this.player.walkPhase = 0;
         }
-        if (input.actionJustPressed && !this.#isNearInteriorStoryNpc()) {
+        if (input.actionJustPressed && !this.#isNearInteriorStoryNpc() && !this.#isNearPendingTargetNpc()) {
           const encounterNpc = this.#findNearbyEncounterNpc();
           if (encounterNpc && this.cutscene) {
             this.player.speed = 0;
@@ -1930,6 +1965,15 @@ export class Engine {
       });
       this.setObjective(activeMission.targetLocation);
       this.#persistSaveState();
+    } else if (this.#isNearPendingTargetNpc() && input.actionJustPressed) {
+      const itemDef = this.storyPackage?.items?.get(activeMission.giveItem);
+      const itemName = itemDef?.name || activeMission.giveItem || 'o item';
+      const pickupName = this.locationNames.get(activeMission.pickupLocation) || activeMission.pickupLocation;
+      const hintMsg = activeMission.pickupObjective || `Você ainda não pegou ${itemName}! Vá até ${pickupName} primeiro.`;
+      this.hud.showToast(hintMsg, {
+        imageUrl: itemDef?.imageUrl || '',
+        imageAlt: itemName
+      });
     } else {
       const requiresBuildingEntry =
         this.objectiveLocationType === 'commerce' || this.objectiveLocationType === 'house';
@@ -1989,7 +2033,7 @@ export class Engine {
       : null;
 
     const nearbyEncounterNpc = this.#findNearbyEncounterNpc();
-    const objectiveHint = this.#isNearInteriorStoryNpc()
+    const objectiveHint = (this.#isNearInteriorStoryNpc() || this.#isNearPendingTargetNpc())
       ? 'Aperte Ação para falar'
       : nearbyEncounterNpc
         ? (nearbyEncounterNpc.prompt || 'Aperte Ação para falar')
@@ -2190,6 +2234,12 @@ export class Engine {
     const pickupItemDef = isPickupStage ? this.storyPackage?.items?.get(activeMission.giveItem) : null;
 
     const hideTargetNpc = isPickupStage || this.missionOutTriggered || this.freeRoamMode;
+    const pendingTargetNpc = isPickupStage && !this.missionOutTriggered && !this.freeRoamMode
+      ? this.#getMissionTargetNpcPoint()
+      : null;
+    const extraNpcs = pendingTargetNpc
+      ? [...this.completedNpcPoints, ...this.encounterNpcs, pendingTargetNpc]
+      : [...this.completedNpcPoints, ...this.encounterNpcs];
     this.renderer.renderFrame({
       camera: renderCam,
       cityMap: this.cityMap,
@@ -2205,7 +2255,7 @@ export class Engine {
       worldCollectibles: this.worldCollectibles,
       objectivePoint: hideTargetNpc ? null : this.objectivePoint,
       objectiveNpcPoint: hideTargetNpc ? null : this.objectiveNpcPoint,
-      completedNpcPoints: [...this.completedNpcPoints, ...this.encounterNpcs],
+      completedNpcPoints: extraNpcs,
       encounterLocations: this.encounterLocationCodes,
       emitNpcWaves: !hideTargetNpc && Boolean(this.objectiveNpcPoint || this.objectivePoint),
       time: this.elapsedTime
