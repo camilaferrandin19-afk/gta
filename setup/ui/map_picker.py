@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import html
 from pathlib import Path
+import re
 from typing import Callable
 
 from PySide6.QtCore import Qt, QTimer
@@ -31,6 +32,7 @@ from ..core.models import StoryPackage
 
 MAP_SCALE = 0.08
 ISLAND_MARGIN = 12.0
+CORNER_RE = re.compile(r'^(RUA-\d+)\s*[xX×]\s*(RUA-\d+)(?:\s+(NO|NE|SO|SE))?$', re.IGNORECASE)
 
 KIND_COLORS = {
     'CASA': '#d97757',   # Terracota / Laranja-tijolo
@@ -95,6 +97,7 @@ class CityMapCanvas(QWidget):
         on_select: Callable[[str], None],
         buildings_only: bool = False,
         allow_roads: bool = False,
+        allow_intersections: bool = False,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
@@ -102,6 +105,7 @@ class CityMapCanvas(QWidget):
         self._on_select = on_select
         self._buildings_only = buildings_only
         self._allow_roads = allow_roads
+        self._allow_intersections = allow_intersections
         self._pkg: StoryPackage | None = None
         self._selected_code = ''
         self._items_by_code: dict[str, _SelectableMapRect] = {}
@@ -115,14 +119,18 @@ class CityMapCanvas(QWidget):
         top_bar = QHBoxLayout()
         top_bar.setSpacing(10)
 
-        for label, color, border in (
+        legend_items = [
             ('Casa', KIND_COLORS['CASA'], '#0e1015'),
             ('Comércio', KIND_COLORS['COM'], '#0e1015'),
             ('Praça', KIND_COLORS['PRACA'], '#0e1015'),
             ('Hospital', KIND_COLORS['HOSP'], '#ef4444'),
             ('Rua', KIND_COLORS['RUA'], '#475569'),
-            ('Selecionado', '#f59e0b', '#f59e0b'),
-        ):
+        ]
+        if allow_intersections:
+            legend_items.append(('Esquina', '#38bdf8', '#0284c7'))
+        legend_items.append(('Selecionado', '#f59e0b', '#f59e0b'))
+
+        for label, color, border in legend_items:
             swatch = QLabel()
             swatch.setFixedSize(12, 12)
             swatch.setStyleSheet(
@@ -180,7 +188,12 @@ class CityMapCanvas(QWidget):
 
     def render_map(self, pkg: StoryPackage | None, selected_code: str = '') -> None:
         self._pkg = pkg
-        self._selected_code = (selected_code or '').strip().upper()
+        raw_sel = (selected_code or '').strip()
+        corner_match = CORNER_RE.match(raw_sel)
+        if corner_match:
+            self._selected_code = f'{corner_match.group(1).upper()} x {corner_match.group(2).upper()}'
+        else:
+            self._selected_code = raw_sel.upper()
         self.scene.clear()
         self._items_by_code.clear()
 
@@ -228,6 +241,42 @@ class CityMapCanvas(QWidget):
                 rect.setToolTip(f'{code} — {loc.name if loc else meta.default_name}')
                 self.scene.addItem(rect)
                 self._items_by_code[code] = rect
+
+        # Esquinas / intersecções clicáveis (opcional)
+        if self._allow_intersections:
+            horiz_roads = [
+                (code, meta)
+                for code, meta in self._canonical.items()
+                if meta.kind == 'RUA' and meta.w > meta.h > 0
+            ]
+            vert_roads = [
+                (code, meta)
+                for code, meta in self._canonical.items()
+                if meta.kind == 'RUA' and meta.h > meta.w > 0
+            ]
+            for h_code, h_meta in horiz_roads:
+                for v_code, v_meta in vert_roads:
+                    inter_key = f'{h_code} x {v_code}'
+                    is_sel = inter_key == self._selected_code
+                    rect = _SelectableMapRect(
+                        v_meta.x * MAP_SCALE,
+                        h_meta.y * MAP_SCALE,
+                        v_meta.w * MAP_SCALE,
+                        h_meta.h * MAP_SCALE,
+                        f'{inter_key} SE',
+                        True,
+                        self._on_select,
+                    )
+                    rect.setBrush(
+                        QBrush(QColor(245, 158, 11, 160) if is_sel else QColor(56, 189, 248, 45))
+                    )
+                    rect.setPen(
+                        QPen(QColor('#f59e0b'), 2.0) if is_sel else QPen(QColor(56, 189, 248, 110), 0.7)
+                    )
+                    rect.setZValue(11 if is_sel else 4)
+                    rect.setToolTip(f'Esquina {inter_key}')
+                    self.scene.addItem(rect)
+                    self._items_by_code[inter_key] = rect
 
         # Edificações, praças e hospitais na posição oficial
         for code, meta in self._canonical.items():
@@ -286,13 +335,25 @@ class CityMapCanvas(QWidget):
                 self.view.verticalScrollBar().setValue(self.view.verticalScrollBar().minimum())
 
     def focus_code(self, code: str) -> None:
-        item = self._items_by_code.get((code or '').strip().upper())
+        raw = (code or '').strip()
+        m = CORNER_RE.match(raw)
+        lookup = f'{m.group(1).upper()} x {m.group(2).upper()}' if m else raw.upper()
+        item = self._items_by_code.get(lookup)
         if item is not None:
             self.view.ensureVisible(item, 80, 80)
 
 
+def _normalize_location_code(raw_code: str) -> str:
+    raw = (raw_code or '').strip()
+    m = CORNER_RE.match(raw)
+    if m:
+        dir_part = (m.group(3) or 'SE').upper()
+        return f'{m.group(1).upper()} x {m.group(2).upper()} {dir_part}'
+    return raw.upper()
+
+
 class LocationPickerDialog(QDialog):
-    """Diálogo visual para escolher um local clicando nos prédios/praças do mapa oficial."""
+    """Diálogo visual para escolher construções, praças, ruas ou esquinas no mapa oficial."""
 
     def __init__(
         self,
@@ -307,7 +368,7 @@ class LocationPickerDialog(QDialog):
         self._pkg = pkg
         self._buildings_only = buildings_only
         self._canonical = load_canonical_city_locations(app_root)
-        self.selected_code = (current_code or '').strip().upper()
+        self.selected_code = _normalize_location_code(current_code)
 
         self.setWindowTitle('Escolher Local no Mapa')
         self.resize(820, 720)
@@ -316,7 +377,7 @@ class LocationPickerDialog(QDialog):
         hint = QLabel(
             'Clique em uma edificação no mapa para selecionar (CASA/COM). Use a roda do mouse para zoom:'
             if buildings_only
-            else 'Clique em uma edificação, praça ou hospital no mapa para selecionar. Use a roda do mouse para zoom:'
+            else 'Clique em uma construção, praça, hospital, rua ou esquina (intersecção) no mapa. Use a roda do mouse para zoom:'
         )
         layout.addWidget(hint)
 
@@ -324,10 +385,28 @@ class LocationPickerDialog(QDialog):
             self._canonical,
             on_select=self._on_rect_clicked,
             buildings_only=buildings_only,
-            allow_roads=False,
+            allow_roads=not buildings_only,
+            allow_intersections=not buildings_only,
             parent=self,
         )
         layout.addWidget(self.map_canvas, 1)
+
+        self.corner_bar = QWidget()
+        corner_layout = QHBoxLayout(self.corner_bar)
+        corner_layout.setContentsMargins(0, 0, 0, 0)
+        corner_layout.setSpacing(6)
+        corner_layout.addWidget(QLabel('Canto da esquina:'))
+        self._corner_buttons: dict[str, QPushButton] = {}
+        for direction in ('NO', 'NE', 'SO', 'SE'):
+            btn = QPushButton(direction)
+            btn.setCheckable(True)
+            btn.setFixedWidth(48)
+            btn.clicked.connect(lambda _checked=False, d=direction: self._set_corner_direction(d))
+            self._corner_buttons[direction] = btn
+            corner_layout.addWidget(btn)
+        corner_layout.addStretch(1)
+        self.corner_bar.setVisible(False)
+        layout.addWidget(self.corner_bar)
 
         self.selection_label = QLabel()
         self.selection_label.setTextFormat(Qt.TextFormat.RichText)
@@ -353,18 +432,46 @@ class LocationPickerDialog(QDialog):
         self._update_selection_label()
 
     def _location_name(self, code: str) -> str:
+        m = CORNER_RE.match(code)
+        if m:
+            r1 = m.group(1).upper()
+            r2 = m.group(2).upper()
+            d = (m.group(3) or 'SE').upper()
+            n1 = self._pkg.locations[r1].name if self._pkg and r1 in self._pkg.locations else r1
+            n2 = self._pkg.locations[r2].name if self._pkg and r2 in self._pkg.locations else r2
+            return f'Esquina {n1} com {n2} ({d})'
         if self._pkg and code in self._pkg.locations:
             return self._pkg.locations[code].name
         if code in self._canonical:
             return self._canonical[code].default_name
         return ''
 
+    def _set_corner_direction(self, direction: str) -> None:
+        m = CORNER_RE.match(self.selected_code)
+        if not m:
+            return
+        self.selected_code = f'{m.group(1).upper()} x {m.group(2).upper()} {direction}'
+        self._update_selection_label()
+
     def _on_rect_clicked(self, code: str) -> None:
-        self.selected_code = code
+        m_new = CORNER_RE.match(code)
+        m_old = CORNER_RE.match(self.selected_code)
+        if m_new and m_old:
+            # Mantém o canto escolhido se clicar em outra esquina
+            dir_part = (m_old.group(3) or m_new.group(3) or 'SE').upper()
+            self.selected_code = f'{m_new.group(1).upper()} x {m_new.group(2).upper()} {dir_part}'
+        else:
+            self.selected_code = _normalize_location_code(code)
         self.map_canvas.render_map(self._pkg, self.selected_code)
         self._update_selection_label()
 
     def _update_selection_label(self) -> None:
+        m = CORNER_RE.match(self.selected_code)
+        self.corner_bar.setVisible(bool(m) and not self._buildings_only)
+        if m:
+            cur_dir = (m.group(3) or 'SE').upper()
+            for d, btn in self._corner_buttons.items():
+                btn.setChecked(d == cur_dir)
         if not self.selected_code:
             self.selection_label.setText('Nenhum local selecionado.')
             self._ok_btn.setEnabled(False)
@@ -419,9 +526,13 @@ class LocationPickerField(QWidget):
             layout.addWidget(self.clear_btn)
 
     def set_code(self, code: str) -> None:
-        self._code = (code or '').strip().upper()
+        self._code = _normalize_location_code(code)
         if not self._code:
             self.display_edit.clear()
+            return
+        m = CORNER_RE.match(self._code)
+        if m:
+            self.display_edit.setText(self._code)
             return
         pkg = self._pkg_provider()
         loc = pkg.locations.get(self._code) if pkg else None
