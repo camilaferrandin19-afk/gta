@@ -58,6 +58,7 @@ export class Engine {
     this.inventoryController = options.inventoryController || null;
     this.preloadedUrls = options.preloadedUrls || new Set();
     this.onExitToTitle = options.onExitToTitle || null;
+    this.onChangeStory = options.onChangeStory || null;
     this.onNewGame = options.onNewGame || null;
     this.onRefreshAssets = options.onRefreshAssets || null;
     this.onResetGame = options.onResetGame || null;
@@ -284,6 +285,10 @@ export class Engine {
       onResetGame: () => {
         this.onResetGame?.();
       },
+      onChangeStory: () => {
+        this.#persistSaveState();
+        this.onChangeStory?.();
+      },
       onExitToTitle: () => {
         this.#persistSaveState();
         this.onExitToTitle?.();
@@ -392,6 +397,10 @@ export class Engine {
       },
       onResetGame: () => {
         this.onResetGame?.();
+      },
+      onChangeStory: () => {
+        this.#persistSaveState();
+        this.onChangeStory?.();
       },
       onExitToTitle: () => {
         this.#persistSaveState();
@@ -528,6 +537,10 @@ export class Engine {
       },
       onResetGame: () => {
         this.onResetGame?.();
+      },
+      onChangeStory: () => {
+        this.#persistSaveState();
+        this.onChangeStory?.();
       },
       onExitToTitle: () => {
         this.#persistSaveState();

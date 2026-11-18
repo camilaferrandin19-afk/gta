@@ -2,6 +2,7 @@ import { Engine } from './core/engine.js?v=57';
 import { HudController } from './ui/hud-controller.js?v=41';
 import { CutsceneController } from './ui/cutscene-controller.js?v=15';
 import { PauseMenuController } from './ui/pause-menu.js?v=6';
+import { StorySelectorController } from './ui/story-selector.js?v=1';
 import { ConfirmDialogController } from './ui/confirm-dialog.js?v=2';
 import { AssetsRefreshDialogController } from './ui/assets-refresh-dialog.js?v=2';
 import { InventoryController } from './ui/inventory-controller.js?v=21';
@@ -13,6 +14,7 @@ import {
 } from './core/save-state.js?v=2';
 import {
   loadStoryCatalog,
+  shouldShowStorySelector,
   loadStorySplashHeader,
   loadStoryPackage,
   markAssetLoaded,
@@ -36,6 +38,7 @@ async function boot() {
   const confirmDialog = new ConfirmDialogController();
   const assetsRefreshDialog = new AssetsRefreshDialogController();
   const pauseMenu = new PauseMenuController(confirmDialog, assetsRefreshDialog);
+  const storySelector = new StorySelectorController();
   const inventoryController = new InventoryController();
   const canvas = document.getElementById('game-canvas');
   const minimapCanvas = document.getElementById('minimap-canvas');
@@ -60,11 +63,8 @@ async function boot() {
     });
   };
 
-  try {
-    hud.showLoading(10, 'Lendo catálogo de histórias...');
-    storyCatalog = await loadStoryCatalog('./story/stories.json');
-    const urlStoryId = new URLSearchParams(window.location.search).get('story');
-    selectedStory = (urlStoryId && storyCatalog.find((s) => s.id === urlStoryId)) || storyCatalog[0];
+  const loadAndPrepareStory = async (storyEntry) => {
+    selectedStory = storyEntry;
     const storyBasePath = selectedStory.path;
 
     hud.showLoading(15, 'Lendo abertura da história...');
@@ -94,7 +94,9 @@ async function boot() {
 
     // Yield para garantir que o navegador pinte a splash screen antes de gerar o mapa
     await waitMs(16);
-    cityMap = new CityMap();
+    if (!cityMap) {
+      cityMap = new CityMap();
+    }
 
     hud.setStartLoadingProgress(12, 'Carregando dados da história e missões...', { ready: false });
     storyPackage = await loadStoryPackage(storyBasePath, cityMap, {
@@ -135,6 +137,42 @@ async function boot() {
     });
 
     hud.setStartLoadingProgress(100, `Recursos da ${missionLabel} carregados!`, { ready: true });
+  };
+
+  const openStorySelector = (errorMessage = '', onReady = null) => {
+    hud.loadingScreen?.classList.add('hidden');
+    hud.startScreen?.classList.add('hidden');
+    hud.hudLayer?.classList.add('hidden');
+    storySelector.show(storyCatalog, {
+      errorMessage,
+      onSelect: async (entry) => {
+        storySelector.hide();
+        try {
+          await loadAndPrepareStory(entry);
+          onReady?.();
+        } catch (error) {
+          console.error('[StoryLoader] Erro ao carregar história selecionada:', error);
+          openStorySelector(error?.message || `Erro ao carregar a história "${entry.title}".`, onReady);
+        }
+      },
+    });
+  };
+
+  try {
+    hud.showLoading(10, 'Lendo catálogo de histórias...');
+    storyCatalog = await loadStoryCatalog('./story/stories.json');
+    pauseMenu.setCanChangeStory(shouldShowStorySelector(storyCatalog));
+
+    const urlStoryId = new URLSearchParams(window.location.search).get('story');
+    const urlMatchedStory = urlStoryId ? storyCatalog.find((s) => s.id === urlStoryId) : null;
+
+    if (urlMatchedStory) {
+      await loadAndPrepareStory(urlMatchedStory);
+    } else if (shouldShowStorySelector(storyCatalog)) {
+      await new Promise((resolve) => openStorySelector('', resolve));
+    } else {
+      await loadAndPrepareStory(storyCatalog[0]);
+    }
   } catch (error) {
     console.error('[StoryLoader] Erro ao carregar história:', error);
     hud.showError(error?.message || 'Erro ao carregar o pacote de história.');
@@ -219,6 +257,12 @@ async function boot() {
         onNewGame: () => requestNewGame(() => pauseMenu.close()),
         onRefreshAssets: () => handleRefreshAssets(),
         onResetGame: () => requestResetGame(() => pauseMenu.close()),
+        onChangeStory: () => {
+          activeEngine?.stop();
+          activeEngine = null;
+          hud.hideBackgroundLoadingProgress();
+          openStorySelector();
+        },
         onExitToTitle: () => {
           activeEngine?.stop();
           activeEngine = null;
