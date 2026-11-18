@@ -110,6 +110,7 @@ class StoryPackage:
     body_description: str = ''
     splash: str = 'splash/splash-start.png'
     splash_end: str = 'splash/splash-end.png'
+    protagonist: str = ''
     characters_order: list[str] = field(default_factory=list)
     items_order: list[str] = field(default_factory=list)
     collectibles: list[ExtraItemPlacement] = field(default_factory=list)

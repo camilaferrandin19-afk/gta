@@ -860,8 +860,9 @@ export class Engine {
   #getProtagonistSprites() {
     const chars = this.storyPackage?.characters;
     if (!(chars instanceof Map) || chars.size === 0) return null;
-    const firstChar = chars.values().next().value;
-    return firstChar?.sprites || null;
+    const protId = this.storyPackage?.protagonist;
+    const protChar = (protId && chars.get(protId)) || chars.values().next().value;
+    return protChar?.sprites || null;
   }
 
   #getMissionTargetNpcPoint() {

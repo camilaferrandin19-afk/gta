@@ -33,6 +33,8 @@ def find_dependents(pkg: StoryPackage, kind: str, target_id: str) -> list[str]:
     """Retorna lista legível de locais onde um personagem, item ou missão está em uso."""
     refs: list[str] = []
     if kind == 'character':
+        if pkg.protagonist == target_id:
+            refs.append('História (protagonist)')
         for mid, mission in pkg.missions.items():
             for block in (mission.cutscene_inicio, mission.cutscene_fim):
                 if block.left == target_id or block.right == target_id:
@@ -70,6 +72,9 @@ def validate_story(pkg: StoryPackage, app_root: Path | None = None) -> list[str]
     known_chars = set(pkg.characters.keys())
     known_items = set(pkg.items.keys())
     known_locations = set(pkg.locations.keys())
+
+    if pkg.protagonist and pkg.protagonist not in known_chars:
+        errors.append(f'História (protagonist): personagem "{pkg.protagonist}" não cadastrado.')
 
     for cid, char in pkg.characters.items():
         if not char.name.strip():

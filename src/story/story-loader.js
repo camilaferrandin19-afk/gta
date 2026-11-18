@@ -621,6 +621,15 @@ export async function loadStoryPackage(basePath = './story', cityMap = null, opt
     }
   }
 
+  const protagonist = manifest.protagonist || manifest.characters[0] || '';
+  if (manifest.protagonist && !characters.has(manifest.protagonist)) {
+    throw new StoryParseError(
+      'story.md',
+      2,
+      `Protagonista "${manifest.protagonist}" não declarado em "characters" de story.md.`,
+    );
+  }
+
   console.info(
     `[StoryLoader] História "${manifest.title}" carregada (${characters.size} personagens, ${items.size} itens, ${extraItems.length} extras no mapa, ${missions.length} missões, ${encounters.length} encontros extras, ${locationNames.size} locais nomeados).`,
   );
@@ -631,6 +640,7 @@ export async function loadStoryPackage(basePath = './story', cityMap = null, opt
     subtitle: replaceStoryPlaceholders(manifest.subtitle, { locationNames, items, characters }),
     splashUrl: withBust(splashUrl),
     faviconUrl: withBust(faviconUrl),
+    protagonist,
     npcLines,
     wrongItemLines,
     characters,

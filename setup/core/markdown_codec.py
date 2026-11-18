@@ -109,6 +109,7 @@ def parse_story_markdown(raw_text: str, story_id: str) -> StoryPackage:
         body_description='\n'.join(body_desc_lines),
         splash=meta.get('splash', 'splash/splash-start.png'),
         splash_end=meta.get('splash_end', 'splash/splash-end.png'),
+        protagonist=meta.get('protagonist', '').strip(),
         characters_order=split_csv_list(meta.get('characters', '')),
         items_order=split_csv_list(meta.get('items', '')),
         collectibles=_parse_story_collectibles(meta.get('collectibles', '')),
@@ -126,6 +127,8 @@ def serialize_story_markdown(pkg: StoryPackage) -> str:
     ]
     if pkg.splash_end and pkg.splash_end != 'splash/splash-end.png':
         meta.append(('splash_end', pkg.splash_end))
+    if pkg.protagonist:
+        meta.append(('protagonist', pkg.protagonist))
     meta.append(('characters', ', '.join(pkg.characters_order)))
     meta.append(('items', ', '.join(pkg.items_order)))
     if pkg.collectibles:

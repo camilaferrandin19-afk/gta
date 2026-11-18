@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Callable
 
 from PySide6.QtWidgets import (
+    QComboBox,
     QFileDialog,
     QFormLayout,
     QGroupBox,
@@ -13,6 +14,7 @@ from PySide6.QtWidgets import (
     QPlainTextEdit,
     QPushButton,
     QScrollArea,
+    QSizePolicy,
     QTabWidget,
     QVBoxLayout,
     QWidget,
@@ -53,14 +55,26 @@ class StoryMetadataTab(QWidget):
         info_group = QGroupBox('Identidade da História')
         form = QFormLayout(info_group)
         form.setSpacing(10)
+        form.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow)
 
         self.id_edit = QLineEdit()
         self.id_edit.setReadOnly(True)
         self.title_edit = QLineEdit()
         self.page_title_edit = QLineEdit()
         self.subtitle_edit = QLineEdit()
+        self.protagonist_combo = QComboBox()
         self.desc_edit = QPlainTextEdit()
-        self.desc_edit.setMaximumHeight(90)
+        self.desc_edit.setMinimumHeight(110)
+        self.desc_edit.setMaximumHeight(160)
+        for widget in (
+            self.id_edit,
+            self.title_edit,
+            self.page_title_edit,
+            self.subtitle_edit,
+            self.protagonist_combo,
+            self.desc_edit,
+        ):
+            widget.setSizePolicy(QSizePolicy.Policy.Expanding, widget.sizePolicy().verticalPolicy())
 
         self.splash_picker = AssetPickerRow(story_dir_provider, subdir='splash')
         self.splash_end_picker = AssetPickerRow(story_dir_provider, subdir='splash', allow_clear=True)
@@ -81,6 +95,7 @@ class StoryMetadataTab(QWidget):
         form.addRow('Título no jogo:', self.title_edit)
         form.addRow('Título da aba:', self.page_title_edit)
         form.addRow('Subtítulo:', self.subtitle_edit)
+        form.addRow('Protagonista:', self.protagonist_combo)
         form.addRow('Descrição:', self.desc_edit)
         form.addRow('Favicon (.svg / .png):', favicon_row)
         form.addRow('Imagem de abertura:', self.splash_picker)
@@ -113,7 +128,26 @@ class StoryMetadataTab(QWidget):
         self.title_edit.textChanged.connect(self._sync)
         self.page_title_edit.textChanged.connect(self._sync)
         self.subtitle_edit.textChanged.connect(self._sync)
+        self.protagonist_combo.currentIndexChanged.connect(self._sync)
         self.desc_edit.textChanged.connect(self._sync)
+
+    def _populate_protagonist_combo(self, pkg: StoryPackage | None, selected_id: str) -> None:
+        self.protagonist_combo.blockSignals(True)
+        self.protagonist_combo.clear()
+        self.protagonist_combo.addItem('(padrão — 1º personagem)', '')
+        if pkg:
+            ordered = list(pkg.characters_order)
+            for cid in pkg.characters:
+                if cid not in ordered:
+                    ordered.append(cid)
+            for cid in ordered:
+                char = pkg.characters.get(cid)
+                if not char:
+                    continue
+                self.protagonist_combo.addItem(f'{char.name} ({cid})', cid)
+        idx = self.protagonist_combo.findData(selected_id or '')
+        self.protagonist_combo.setCurrentIndex(idx if idx >= 0 else 0)
+        self.protagonist_combo.blockSignals(False)
 
     def load_package(self, pkg: StoryPackage | None) -> None:
         self._pkg = None
@@ -122,6 +156,7 @@ class StoryMetadataTab(QWidget):
             self.title_edit.clear()
             self.page_title_edit.clear()
             self.subtitle_edit.clear()
+            self._populate_protagonist_combo(None, '')
             self.desc_edit.clear()
             self.splash_picker.set_value('')
             self.splash_end_picker.set_value('')
@@ -136,6 +171,7 @@ class StoryMetadataTab(QWidget):
         self.title_edit.setText(pkg.title)
         self.page_title_edit.setText(pkg.page_title)
         self.subtitle_edit.setText(pkg.subtitle)
+        self._populate_protagonist_combo(pkg, pkg.protagonist)
         self.desc_edit.setPlainText(pkg.body_description)
         self.splash_picker.set_value(pkg.splash)
         self.splash_end_picker.set_value(pkg.splash_end)
@@ -146,6 +182,8 @@ class StoryMetadataTab(QWidget):
         self._pkg = pkg
 
     def refresh_reference_choices(self) -> None:
+        if self._pkg:
+            self._populate_protagonist_combo(self._pkg, self._pkg.protagonist)
         if self.collectibles_editor and self._pkg:
             self.collectibles_editor.load_placements(self._pkg.collectibles)
 
@@ -183,6 +221,7 @@ class StoryMetadataTab(QWidget):
         self._pkg.title = self.title_edit.text().strip()
         self._pkg.page_title = self.page_title_edit.text().strip()
         self._pkg.subtitle = self.subtitle_edit.text().strip()
+        self._pkg.protagonist = str(self.protagonist_combo.currentData() or '').strip()
         self._pkg.body_description = self.desc_edit.toPlainText().strip()
         self._pkg.splash = self.splash_picker.value() or 'splash/splash-start.png'
         self._pkg.splash_end = self.splash_end_picker.value() or 'splash/splash-end.png'

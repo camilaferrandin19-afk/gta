@@ -132,12 +132,14 @@ export function parseStoryManifest(rawText, fileName = 'story.md') {
   const items = parseListField(meta.items);
   const collectibles = parseStoryCollectiblesField(meta.collectibles, fileName);
   const encounters = parseListField(meta.encounters);
+  const protagonist = String(meta.protagonist || '').trim();
 
   return {
     title: meta.title,
     pageTitle: meta.page_title || '',
     subtitle: meta.subtitle || '',
     splash: validateAssetPath(meta.splash || '', fileName, 2),
+    protagonist,
     characters,
     missions,
     items,
