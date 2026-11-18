@@ -28,6 +28,7 @@ from PySide6.QtWidgets import (
 )
 
 from ..core.models import CutsceneBlock, CutsceneStep, Encounter, Mission, StoryPackage
+from .extra_items_widget import ExtraItemsGroupWidget
 from .map_picker import LocationPickerField
 from .rich_text_field import RichTextLineWidget
 
@@ -417,10 +418,17 @@ class MissionsAndEncountersTab(QWidget):
         form.addRow('Prompt entrega:', self.m_delivery_prompt)
         form.addRow('Msg item errado:', self.m_wrong_msg)
 
+        self.extra_items_editor = ExtraItemsGroupWidget(
+            'Itens Extras na Missão (## ITENS)',
+            self._app_root,
+            self._pkg_provider,
+            on_changed=self._on_data_changed,
+        )
         self.cs_inicio = CutsceneEditorWidget('Cutscene Inicial', self._app_root, self._pkg_provider, on_changed=self._on_data_changed)
         self.cs_fim = CutsceneEditorWidget('Cutscene Final', self._app_root, self._pkg_provider, on_changed=self._on_data_changed)
 
         right_layout.addWidget(form_group)
+        right_layout.addWidget(self.extra_items_editor)
         right_layout.addWidget(self.cs_inicio)
         right_layout.addWidget(self.cs_fim)
         scroll.setWidget(right_container)
@@ -563,6 +571,7 @@ class MissionsAndEncountersTab(QWidget):
         _set_combo_by_data(self.m_require_item, m.require_item)
         self.m_delivery_prompt.setText(m.delivery_prompt)
         self.m_wrong_msg.setText(m.wrong_item_message)
+        self.extra_items_editor.load_placements(m.extra_items)
         self.cs_inicio.load_block(m.cutscene_inicio)
         self.cs_fim.load_block(m.cutscene_fim)
         self._current_mission_id = mid

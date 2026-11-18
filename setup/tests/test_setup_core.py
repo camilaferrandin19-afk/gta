@@ -7,10 +7,14 @@ import unittest
 
 from setup.core.city_catalog import load_canonical_city_locations
 from setup.core.markdown_codec import (
+    parse_item_markdown,
     parse_map_markdown,
+    parse_mission_markdown,
+    serialize_item_markdown,
     serialize_map_markdown,
+    serialize_mission_markdown,
 )
-from setup.core.models import MapLocation
+from setup.core.models import ExtraItemPlacement, Item, MapLocation
 from setup.core.story_io import (
     StoryIOError,
     create_story,
@@ -132,6 +136,36 @@ class SetupCoreTests(unittest.TestCase):
         self.assertEqual((praca_001.grid_x, praca_001.grid_y), (2, 2))
         self.assertEqual((praca_001.x, praca_001.y), (1018.0, 898.0))
         self.assertEqual((hosp_001.x, hosp_001.y), (530.0, 1500.0))
+
+    def test_item_catalog_pure_mission_items_and_unique_location_validation(self) -> None:
+        item = Item(id='moeda', name='Moeda', description='Ouro', image='assets/item-moeda-dourada.svg')
+        item_md = serialize_item_markdown(item)
+        self.assertNotIn('location:', item_md)
+        self.assertNotIn('category:', item_md)
+        self.assertNotIn('rarity:', item_md)
+        parsed_item = parse_item_markdown(item_md, 'moeda.md')
+        self.assertEqual(parsed_item.name, 'Moeda')
+
+        pkg = load_story_package(self.app_copy, 'vibe-coding')
+        self.assertGreater(len(pkg.collectibles), 0)
+        first_mission = pkg.missions[pkg.missions_order[0]]
+        first_mission.extra_items = [
+            ExtraItemPlacement(item_id='caixa-secreta', location='PRACA-002', rarity='especial')
+        ]
+        mission_md = serialize_mission_markdown(first_mission)
+        self.assertIn('## ITENS', mission_md)
+        parsed_mission = parse_mission_markdown(mission_md, 'm.md')
+        self.assertEqual(len(parsed_mission.extra_items), 1)
+        self.assertEqual(parsed_mission.extra_items[0].location, 'PRACA-002')
+        self.assertEqual(parsed_mission.extra_items[0].rarity, 'especial')
+
+        # Mesmo item posicionado em dois locais diferentes deve falhar na validação
+        dup_item_id = pkg.collectibles[0].item_id
+        first_mission.extra_items = [
+            ExtraItemPlacement(item_id=dup_item_id, location='CASA-001', rarity='normal')
+        ]
+        errors = validate_story(pkg, self.app_copy)
+        self.assertTrue(any('mais de um local' in e for e in errors))
 
 
 if __name__ == '__main__':

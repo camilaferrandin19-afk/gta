@@ -8,6 +8,7 @@ from .models import (
     CutsceneBlock,
     CutsceneStep,
     Encounter,
+    ExtraItemPlacement,
     Item,
     MapLocation,
     Mission,
@@ -16,6 +17,7 @@ from .models import (
 
 
 HEX_COLOR_RE = re.compile(r'^#[0-9a-fA-F]{6}$')
+COLLECTIBLE_ENTRY_RE = re.compile(r'^([^\s@]+)\s*@\s*(.+?)(?:\s*\(([^)]+)\))?\s*$')
 
 
 class CodecError(ValueError):
@@ -67,6 +69,26 @@ def split_csv_list(raw: str) -> list[str]:
     return [part.strip() for part in (raw or '').split(',') if part.strip()]
 
 
+def _parse_story_collectibles(raw_value: str) -> list[ExtraItemPlacement]:
+    placements: list[ExtraItemPlacement] = []
+    for entry in split_csv_list(raw_value):
+        m = COLLECTIBLE_ENTRY_RE.match(entry)
+        if m:
+            item_id = m.group(1).strip()
+            location = m.group(2).strip()
+            rarity = (m.group(3) or 'normal').strip().lower() or 'normal'
+            placements.append(ExtraItemPlacement(item_id=item_id, location=location, rarity=rarity))
+    return placements
+
+
+def _serialize_story_collectibles(placements: list[ExtraItemPlacement]) -> str:
+    parts: list[str] = []
+    for p in placements:
+        rarity = (p.rarity or 'normal').strip().lower()
+        parts.append(f'{p.item_id} @ {p.location} ({rarity})')
+    return ', '.join(parts)
+
+
 def parse_story_markdown(raw_text: str, story_id: str) -> StoryPackage:
     meta, body = parse_frontmatter(raw_text, 'story.md')
     body_title = ''
@@ -89,7 +111,7 @@ def parse_story_markdown(raw_text: str, story_id: str) -> StoryPackage:
         splash_end=meta.get('splash_end', 'splash/splash-end.png'),
         characters_order=split_csv_list(meta.get('characters', '')),
         items_order=split_csv_list(meta.get('items', '')),
-        collectibles_order=split_csv_list(meta.get('collectibles', '')),
+        collectibles=_parse_story_collectibles(meta.get('collectibles', '')),
         missions_order=split_csv_list(meta.get('missions', '')),
         encounters_order=split_csv_list(meta.get('encounters', '')),
     )
@@ -106,8 +128,8 @@ def serialize_story_markdown(pkg: StoryPackage) -> str:
         meta.append(('splash_end', pkg.splash_end))
     meta.append(('characters', ', '.join(pkg.characters_order)))
     meta.append(('items', ', '.join(pkg.items_order)))
-    if pkg.collectibles_order:
-        meta.append(('collectibles', ', '.join(pkg.collectibles_order)))
+    if pkg.collectibles:
+        meta.append(('collectibles', _serialize_story_collectibles(pkg.collectibles)))
     meta.append(('missions', ', '.join(pkg.missions_order)))
     if pkg.encounters_order:
         meta.append(('encounters', ', '.join(pkg.encounters_order)))
@@ -158,9 +180,6 @@ def parse_item_markdown(raw_text: str, file_name: str) -> Item:
         name=meta.get('name', '').strip(),
         description=meta.get('description', '').strip(),
         image=meta.get('image', '').strip(),
-        location=meta.get('location', '').strip(),
-        category=(meta.get('category', 'missao') or 'missao').strip().lower(),
-        rarity=meta.get('rarity', '').strip(),
     )
 
 
@@ -170,11 +189,7 @@ def serialize_item_markdown(item: Item) -> str:
         ('name', item.name),
         ('description', item.description),
         ('image', item.image),
-        ('location', item.location),
-        ('category', item.category or 'missao'),
     ]
-    if item.rarity:
-        fields.append(('rarity', item.rarity))
     return serialize_frontmatter(fields)
 
 
@@ -277,6 +292,30 @@ def _split_cutscene_sections(body: str) -> dict[str, list[str]]:
     return sections
 
 
+def _parse_mission_items_block(lines: list[str]) -> list[ExtraItemPlacement]:
+    entries: list[ExtraItemPlacement] = []
+    for raw_line in lines:
+        trimmed = raw_line.strip()
+        if not trimmed:
+            continue
+        clean = trimmed[2:].strip() if trimmed.startswith('- ') else trimmed
+        parts = [p.strip() for p in clean.split('|')]
+        if len(parts) >= 2 and parts[0] and parts[1]:
+            rarity = (parts[2] if len(parts) >= 3 and parts[2] else 'normal').lower()
+            entries.append(ExtraItemPlacement(item_id=parts[0], location=parts[1], rarity=rarity))
+    return entries
+
+
+def _serialize_mission_items_block(items: list[ExtraItemPlacement]) -> str:
+    if not items:
+        return ''
+    lines = ['## ITENS']
+    for entry in items:
+        rarity = (entry.rarity or 'normal').strip().lower()
+        lines.append(f'- {entry.item_id} | {entry.location} | {rarity}')
+    return '\n'.join(lines)
+
+
 def parse_mission_markdown(raw_text: str, file_name: str) -> Mission:
     meta, body = parse_frontmatter(raw_text, file_name)
     sections = _split_cutscene_sections(body)
@@ -292,6 +331,7 @@ def parse_mission_markdown(raw_text: str, file_name: str) -> Mission:
         require_item=meta.get('require_item', '').strip(),
         delivery_prompt=meta.get('delivery_prompt', '').strip(),
         wrong_item_message=meta.get('wrong_item_message', '').strip(),
+        extra_items=_parse_mission_items_block(sections.get('ITENS', [])),
         cutscene_inicio=_parse_cutscene_block('CUTSCENE_INICIO', sections.get('CUTSCENE_INICIO', [])),
         cutscene_fim=_parse_cutscene_block('CUTSCENE_FIM', sections.get('CUTSCENE_FIM', [])),
     )
@@ -311,10 +351,14 @@ def serialize_mission_markdown(mission: Mission) -> str:
         ('delivery_prompt', mission.delivery_prompt),
         ('wrong_item_message', mission.wrong_item_message),
     ]
-    body = '\n\n'.join([
+    blocks = [
         _serialize_cutscene_block(mission.cutscene_inicio),
         _serialize_cutscene_block(mission.cutscene_fim),
-    ])
+    ]
+    items_block = _serialize_mission_items_block(mission.extra_items)
+    if items_block:
+        blocks.append(items_block)
+    body = '\n\n'.join(blocks)
     return serialize_frontmatter(fields, body)
 
 

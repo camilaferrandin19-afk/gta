@@ -18,13 +18,21 @@ from PySide6.QtWidgets import (
 
 from ..core.models import StoryPackage
 from ..core.story_io import StoryIOError, apply_story_favicon, find_story_favicon
+from .extra_items_widget import ExtraItemsGroupWidget
 from .widgets import AssetPickerRow, AssetPreviewWidget
 
 
 class StoryMetadataTab(QWidget):
     """Aba de metadados gerais e imagens de abertura/encerramento da história."""
 
-    def __init__(self, story_dir_provider: Callable[[], Path | None], parent: QWidget | None = None) -> None:
+    def __init__(
+        self,
+        story_dir_provider: Callable[[], Path | None],
+        app_root: Path | None = None,
+        pkg_provider: Callable[[], StoryPackage | None] | None = None,
+        on_data_changed: Callable[[], None] | None = None,
+        parent: QWidget | None = None,
+    ) -> None:
         super().__init__(parent)
         self._story_dir_provider = story_dir_provider
         self._pkg: StoryPackage | None = None
@@ -69,6 +77,15 @@ class StoryMetadataTab(QWidget):
         form.addRow('Imagem de fim:', self.splash_end_picker)
 
         root.addWidget(info_group)
+        self.collectibles_editor: ExtraItemsGroupWidget | None = None
+        if app_root is not None and pkg_provider is not None:
+            self.collectibles_editor = ExtraItemsGroupWidget(
+                'Colecionáveis Globais (story.md)',
+                app_root,
+                pkg_provider,
+                on_changed=on_data_changed,
+            )
+            root.addWidget(self.collectibles_editor)
         root.addStretch(1)
 
         self.title_edit.textChanged.connect(self._sync)
@@ -89,6 +106,8 @@ class StoryMetadataTab(QWidget):
             self.favicon_preview.load_file(None)
             self.favicon_edit.clear()
             self.favicon_btn.setEnabled(False)
+            if self.collectibles_editor:
+                self.collectibles_editor.load_placements([])
             return
 
         self.id_edit.setText(pkg.id)
@@ -100,6 +119,8 @@ class StoryMetadataTab(QWidget):
         self.splash_end_picker.set_value(pkg.splash_end)
         self.favicon_btn.setEnabled(True)
         self._refresh_favicon()
+        if self.collectibles_editor:
+            self.collectibles_editor.load_placements(pkg.collectibles)
         self._pkg = pkg
 
     def _refresh_favicon(self) -> None:

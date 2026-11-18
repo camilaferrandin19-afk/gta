@@ -34,9 +34,13 @@ class Item:
     name: str
     description: str = ''
     image: str = ''
-    location: str = ''
-    category: str = 'missao'
-    rarity: str = ''
+
+
+@dataclass
+class ExtraItemPlacement:
+    item_id: str
+    location: str
+    rarity: str = 'normal'
 
 
 @dataclass
@@ -71,6 +75,7 @@ class Mission:
     require_item: str = ''
     delivery_prompt: str = ''
     wrong_item_message: str = ''
+    extra_items: list[ExtraItemPlacement] = field(default_factory=list)
     cutscene_inicio: CutsceneBlock = field(default_factory=lambda: CutsceneBlock(name='CUTSCENE_INICIO'))
     cutscene_fim: CutsceneBlock = field(default_factory=lambda: CutsceneBlock(name='CUTSCENE_FIM'))
 
@@ -107,7 +112,7 @@ class StoryPackage:
     splash_end: str = 'splash/splash-end.png'
     characters_order: list[str] = field(default_factory=list)
     items_order: list[str] = field(default_factory=list)
-    collectibles_order: list[str] = field(default_factory=list)
+    collectibles: list[ExtraItemPlacement] = field(default_factory=list)
     missions_order: list[str] = field(default_factory=list)
     encounters_order: list[str] = field(default_factory=list)
     characters: dict[str, Character] = field(default_factory=dict)

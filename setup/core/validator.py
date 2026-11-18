@@ -11,6 +11,22 @@ HEX_COLOR_RE = re.compile(r'^#[0-9a-fA-F]{6}$')
 URL_RE = re.compile(r'^https?://\S+$', re.IGNORECASE)
 BRACKET_TOKEN_RE = re.compile(r'\[([^\[\]\n]+)\]')
 LOC_CODE_RE = re.compile(r'^(RUA|CASA|COM|PRACA)-\d+$', re.IGNORECASE)
+INTERSECTION_RE = re.compile(r'^(RUA-\d+)\s*x\s*(RUA-\d+)(?:\s+(NE|NO|SE|SO))?$', re.IGNORECASE)
+VALID_RARITIES = {'normal', 'especial', 'lendario'}
+
+
+def _is_valid_item_location(location: str, known_locations: set[str]) -> bool:
+    if not location:
+        return False
+    if not known_locations:
+        return True
+    upper = location.strip().upper()
+    if upper in known_locations:
+        return True
+    m = INTERSECTION_RE.match(upper)
+    if m:
+        return m.group(1) in known_locations and m.group(2) in known_locations
+    return False
 
 
 def find_dependents(pkg: StoryPackage, kind: str, target_id: str) -> list[str]:
@@ -25,11 +41,15 @@ def find_dependents(pkg: StoryPackage, kind: str, target_id: str) -> list[str]:
             if enc.npc == target_id or enc.cutscene.left == target_id or enc.cutscene.right == target_id:
                 refs.append(f'Encontro extra "{eid}"')
     elif kind == 'item':
+        if any(c.item_id == target_id for c in pkg.collectibles):
+            refs.append('História (collectibles)')
         for mid, mission in pkg.missions.items():
             if mission.give_item == target_id:
                 refs.append(f'Missão "{mission.title or mid}" (give_item)')
             if mission.require_item == target_id:
                 refs.append(f'Missão "{mission.title or mid}" (require_item)')
+            if any(ex.item_id == target_id for ex in mission.extra_items):
+                refs.append(f'Missão "{mission.title or mid}" (## ITENS)')
             for block in (mission.cutscene_inicio, mission.cutscene_fim):
                 if any(step.kind == 'deliver' and step.text == target_id for step in block.steps):
                     refs.append(f'Missão "{mission.title or mid}" ({block.name}: ENTREGAR)')
@@ -99,6 +119,41 @@ def validate_story(pkg: StoryPackage, app_root: Path | None = None) -> list[str]
 
         _validate_cutscene_block(mission.cutscene_inicio, f'Missão "{mid}" ({mission.cutscene_inicio.name})', known_chars, known_items, known_locations, errors)
         _validate_cutscene_block(mission.cutscene_fim, f'Missão "{mid}" ({mission.cutscene_fim.name})', known_chars, known_items, known_locations, errors)
+
+    placed_items: dict[str, tuple[str, str]] = {}
+
+    def _register_item_placement(item_id: str, location: str, context: str) -> None:
+        if not item_id:
+            return
+        norm_loc = location.strip().upper()
+        if item_id in placed_items:
+            prev_loc, prev_ctx = placed_items[item_id]
+            errors.append(
+                f'Item "{item_id}" posicionado em mais de um local ("{prev_loc}" em {prev_ctx} e "{location}" em {context}).'
+            )
+            return
+        placed_items[item_id] = (norm_loc, context)
+
+    for col in pkg.collectibles:
+        if col.item_id not in known_items:
+            errors.append(f'Colecionável global (story.md): item "{col.item_id}" não cadastrado.')
+        if not _is_valid_item_location(col.location, known_locations):
+            errors.append(f'Colecionável global "{col.item_id}" (story.md): local "{col.location}" inexistente.')
+        if (col.rarity or 'normal').lower() not in VALID_RARITIES:
+            errors.append(f'Colecionável global "{col.item_id}" (story.md): raridade inválida "{col.rarity}".')
+        _register_item_placement(col.item_id, col.location, 'story.md (collectibles)')
+
+    for mid, mission in pkg.missions.items():
+        if mission.pickup and mission.give_item:
+            _register_item_placement(mission.give_item, mission.pickup, f'Missão "{mid}" (pickup)')
+        for ex in mission.extra_items:
+            if ex.item_id not in known_items:
+                errors.append(f'Missão "{mid}" (## ITENS): item "{ex.item_id}" não cadastrado.')
+            if not _is_valid_item_location(ex.location, known_locations):
+                errors.append(f'Missão "{mid}" (## ITENS, "{ex.item_id}"): local "{ex.location}" inexistente.')
+            if (ex.rarity or 'normal').lower() not in VALID_RARITIES:
+                errors.append(f'Missão "{mid}" (## ITENS, "{ex.item_id}"): raridade inválida "{ex.rarity}".')
+            _register_item_placement(ex.item_id, ex.location, f'Missão "{mid}" (## ITENS)')
 
     for eid, enc in pkg.encounters.items():
         if enc.npc not in known_chars:

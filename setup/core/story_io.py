@@ -135,7 +135,7 @@ def load_story_package(app_root: Path, story_id: str) -> StoryPackage:
         if char_file.is_file():
             pkg.characters[char_id] = parse_character_markdown(char_file.read_text(encoding='utf-8'), char_file.name)
 
-    for item_id in list(pkg.items_order) + list(pkg.collectibles_order):
+    for item_id in dict.fromkeys(list(pkg.items_order) + [c.item_id for c in pkg.collectibles]):
         item_file = story_dir / 'items' / f'{item_id}.md'
         if item_file.is_file():
             pkg.items[item_id] = parse_item_markdown(item_file.read_text(encoding='utf-8'), item_file.name)
@@ -171,11 +171,8 @@ def save_story_package(app_root: Path, pkg: StoryPackage) -> None:
     pkg.characters_order = [cid for cid in pkg.characters_order if cid in pkg.characters] + [
         cid for cid in pkg.characters if cid not in pkg.characters_order
     ]
-    pkg.items_order = [iid for iid in pkg.items_order if iid in pkg.items and pkg.items[iid].category != 'extra'] + [
-        iid for iid, it in pkg.items.items() if it.category != 'extra' and iid not in pkg.items_order
-    ]
-    pkg.collectibles_order = [iid for iid in pkg.collectibles_order if iid in pkg.items and pkg.items[iid].category == 'extra'] + [
-        iid for iid, it in pkg.items.items() if it.category == 'extra' and iid not in pkg.collectibles_order
+    pkg.items_order = [iid for iid in pkg.items_order if iid in pkg.items] + [
+        iid for iid in pkg.items if iid not in pkg.items_order
     ]
     pkg.missions_order = [mid for mid in pkg.missions_order if mid in pkg.missions] + [
         mid for mid in pkg.missions if mid not in pkg.missions_order

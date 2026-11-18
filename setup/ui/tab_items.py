@@ -5,7 +5,6 @@ import re
 from typing import Callable
 
 from PySide6.QtWidgets import (
-    QComboBox,
     QFormLayout,
     QGroupBox,
     QHBoxLayout,
@@ -22,7 +21,6 @@ from PySide6.QtWidgets import (
 
 from ..core.models import Item, StoryPackage
 from ..core.validator import find_dependents
-from .map_picker import LocationPickerField
 from .widgets import AssetPickerRow
 
 
@@ -30,7 +28,7 @@ SLUG_RE = re.compile(r'^[a-z0-9]+(?:-[a-z0-9]+)*$')
 
 
 class ItemsTab(QWidget):
-    """Aba de gerenciamento de itens de missão e itens extras de inventário."""
+    """Aba de gerenciamento do catálogo puro de itens da história."""
 
     def __init__(
         self,
@@ -75,24 +73,11 @@ class ItemsTab(QWidget):
         self.id_edit.setReadOnly(True)
         self.name_edit = QLineEdit()
         self.desc_edit = QLineEdit()
-        self.category_combo = QComboBox()
-        self.category_combo.addItems(['missao', 'extra'])
-        self.rarity_edit = QLineEdit()
-        self.rarity_edit.setPlaceholderText('Opcional (ex.: comum, raro, épico)')
-        self.location_picker = LocationPickerField(
-            self._app_root,
-            lambda: self._pkg,
-            allow_clear=True,
-            on_changed=lambda _: self._sync(),
-        )
         self.image_picker = AssetPickerRow(story_dir_provider, subdir='assets', on_changed=lambda _: self._sync())
 
         form.addRow('ID:', self.id_edit)
         form.addRow('Nome:', self.name_edit)
         form.addRow('Descrição:', self.desc_edit)
-        form.addRow('Categoria:', self.category_combo)
-        form.addRow('Raridade:', self.rarity_edit)
-        form.addRow('Local no mapa (extra):', self.location_picker)
         form.addRow('Imagem:', self.image_picker)
 
         splitter.addWidget(left_panel)
@@ -101,8 +86,6 @@ class ItemsTab(QWidget):
 
         self.name_edit.textChanged.connect(self._sync)
         self.desc_edit.textChanged.connect(self._sync)
-        self.category_combo.currentTextChanged.connect(self._sync)
-        self.rarity_edit.textChanged.connect(self._sync)
 
     def load_package(self, pkg: StoryPackage | None) -> None:
         self._pkg = pkg
@@ -111,7 +94,7 @@ class ItemsTab(QWidget):
         if not pkg:
             self._clear_form()
             return
-        ordered = list(pkg.items_order) + [iid for iid in pkg.collectibles_order if iid not in pkg.items_order]
+        ordered = list(pkg.items_order)
         for iid in pkg.items:
             if iid not in ordered:
                 ordered.append(iid)
@@ -119,7 +102,7 @@ class ItemsTab(QWidget):
             item = pkg.items.get(iid)
             if not item:
                 continue
-            list_item = QListWidgetItem(f'[{item.category}] {item.name} ({item.id})')
+            list_item = QListWidgetItem(f'{item.name} ({item.id})')
             list_item.setData(256, iid)
             self.item_list.addItem(list_item)
         if self.item_list.count() > 0:
@@ -132,8 +115,6 @@ class ItemsTab(QWidget):
         self.id_edit.clear()
         self.name_edit.clear()
         self.desc_edit.clear()
-        self.rarity_edit.clear()
-        self.location_picker.set_code('')
         self.image_picker.set_value('')
 
     def _on_selected(self, current: QListWidgetItem | None) -> None:
@@ -147,9 +128,6 @@ class ItemsTab(QWidget):
         self.id_edit.setText(item.id)
         self.name_edit.setText(item.name)
         self.desc_edit.setText(item.description)
-        self.category_combo.setCurrentText(item.category if item.category in ('missao', 'extra') else 'missao')
-        self.rarity_edit.setText(item.rarity)
-        self.location_picker.set_code(item.location)
         self.image_picker.set_value(item.image)
         self._current_id = iid
 
@@ -161,13 +139,10 @@ class ItemsTab(QWidget):
             return
         item.name = self.name_edit.text().strip()
         item.description = self.desc_edit.text().strip()
-        item.category = self.category_combo.currentText()
-        item.rarity = self.rarity_edit.text().strip()
-        item.location = self.location_picker.code()
         item.image = self.image_picker.value()
         list_item = self.item_list.currentItem()
         if list_item:
-            list_item.setText(f'[{item.category}] {item.name or item.id} ({item.id})')
+            list_item.setText(f'{item.name or item.id} ({item.id})')
         if self._on_data_changed:
             self._on_data_changed()
 
@@ -184,7 +159,7 @@ class ItemsTab(QWidget):
         if iid in self._pkg.items:
             QMessageBox.warning(self, 'Duplicado', f'Já existe um item com ID "{iid}".')
             return
-        item = Item(id=iid, name=iid.replace('-', ' ').title(), category='missao')
+        item = Item(id=iid, name=iid.replace('-', ' ').title())
         self._pkg.items[iid] = item
         self._pkg.items_order.append(iid)
         self.load_package(self._pkg)
@@ -206,7 +181,6 @@ class ItemsTab(QWidget):
         iid = self._current_id
         self._pkg.items.pop(iid, None)
         self._pkg.items_order = [i for i in self._pkg.items_order if i != iid]
-        self._pkg.collectibles_order = [i for i in self._pkg.collectibles_order if i != iid]
         self.load_package(self._pkg)
         if self._on_data_changed:
             self._on_data_changed()
