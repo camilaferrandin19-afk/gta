@@ -28,7 +28,7 @@ from PySide6.QtWidgets import (
 )
 
 from ..core.models import CutsceneBlock, CutsceneStep, Encounter, Mission, StoryPackage
-from .extra_items_widget import ExtraItemsGroupWidget
+from .extra_items_widget import ExtraItemsGroupWidget, collect_occupied_item_locations
 from .map_picker import LocationPickerField
 from .rich_text_field import RichTextLineWidget
 
@@ -584,11 +584,27 @@ class MissionsAndEncountersTab(QWidget):
             return
         m.title = self.m_title.text().strip()
         m.start = self.m_start.code()
-        m.pickup = self.m_pickup.code()
+        new_pickup = self.m_pickup.code()
+        new_give_item = str(self.m_give_item.currentData() or '')
+        if new_pickup and new_give_item:
+            norm_pickup = ' '.join(new_pickup.strip().upper().split())
+            occupied = collect_occupied_item_locations(self._pkg, exclude_mission_id=m.id)
+            if norm_pickup in occupied:
+                QMessageBox.warning(
+                    self,
+                    'Local já ocupado',
+                    f'O local "{new_pickup}" já possui o item "{occupied[norm_pickup]}". Cada local só pode ter um item.',
+                )
+                self._current_mission_id = None
+                self.m_pickup.set_code(m.pickup)
+                _set_combo_by_data(self.m_give_item, m.give_item)
+                self._current_mission_id = m.id
+                return
+        m.pickup = new_pickup
         m.pickup_objective = self.m_pickup_obj.text().strip()
         m.target = self.m_target.code()
         m.objective = self.m_objective.text().strip()
-        m.give_item = str(self.m_give_item.currentData() or '')
+        m.give_item = new_give_item
         m.require_item = str(self.m_require_item.currentData() or '')
         m.delivery_prompt = self.m_delivery_prompt.text().strip()
         m.wrong_item_message = self.m_wrong_msg.text().strip()

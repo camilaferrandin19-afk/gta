@@ -121,18 +121,26 @@ def validate_story(pkg: StoryPackage, app_root: Path | None = None) -> list[str]
         _validate_cutscene_block(mission.cutscene_fim, f'Missão "{mid}" ({mission.cutscene_fim.name})', known_chars, known_items, known_locations, errors)
 
     placed_items: dict[str, tuple[str, str]] = {}
+    occupied_locations: dict[str, tuple[str, str]] = {}
 
     def _register_item_placement(item_id: str, location: str, context: str) -> None:
-        if not item_id:
+        if not item_id or not location:
             return
-        norm_loc = location.strip().upper()
+        norm_loc = ' '.join(location.strip().upper().split())
         if item_id in placed_items:
             prev_loc, prev_ctx = placed_items[item_id]
             errors.append(
                 f'Item "{item_id}" posicionado em mais de um local ("{prev_loc}" em {prev_ctx} e "{location}" em {context}).'
             )
             return
+        if norm_loc in occupied_locations:
+            prev_item, prev_ctx = occupied_locations[norm_loc]
+            errors.append(
+                f'Local "{location}" já possui o item "{prev_item}" ({prev_ctx}); cada local só pode ter um item (conflito com "{item_id}" em {context}).'
+            )
+            return
         placed_items[item_id] = (norm_loc, context)
+        occupied_locations[norm_loc] = (item_id, context)
 
     for col in pkg.collectibles:
         if col.item_id not in known_items:

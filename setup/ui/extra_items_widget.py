@@ -44,6 +44,27 @@ def collect_placed_item_ids(
     return placed
 
 
+def collect_occupied_item_locations(
+    pkg: StoryPackage | None,
+    exclude_placement: ExtraItemPlacement | None = None,
+    exclude_mission_id: str | None = None,
+) -> dict[str, str]:
+    """Retorna mapa {LOCAL_NORMALIZADO: item_id} para todos os locais já ocupados por algum item."""
+    if not pkg:
+        return {}
+    occupied: dict[str, str] = {}
+    for col in pkg.collectibles:
+        if col is not exclude_placement and col.item_id and col.location:
+            occupied[' '.join(col.location.strip().upper().split())] = col.item_id
+    for mid, mission in pkg.missions.items():
+        if mid != exclude_mission_id and mission.pickup and mission.give_item:
+            occupied[' '.join(mission.pickup.strip().upper().split())] = mission.give_item
+        for ex in mission.extra_items:
+            if ex is not exclude_placement and ex.item_id and ex.location:
+                occupied[' '.join(ex.location.strip().upper().split())] = ex.item_id
+    return occupied
+
+
 class ExtraItemsGroupWidget(QGroupBox):
     """Editor reutilizável de posicionamento de itens extras (## ITENS ou collectibles)."""
 
@@ -130,9 +151,9 @@ class ExtraItemsGroupWidget(QGroupBox):
             loc_picker = LocationPickerField(
                 self._app_root,
                 self._pkg_provider,
-                on_changed=lambda code, p=placement: self._update_location(p, code),
             )
             loc_picker.set_code(placement.location)
+            loc_picker._on_changed = lambda code, p=placement, lp=loc_picker: self._update_location(p, code, lp)
 
             rarity_combo = QComboBox()
             rarity_combo.addItems(list(RARITY_OPTIONS))
@@ -182,7 +203,18 @@ class ExtraItemsGroupWidget(QGroupBox):
         if self._on_changed:
             self._on_changed()
 
-    def _update_location(self, placement: ExtraItemPlacement, location: str) -> None:
+    def _update_location(self, placement: ExtraItemPlacement, location: str, picker: LocationPickerField) -> None:
+        pkg = self._pkg_provider()
+        norm_loc = ' '.join((location or '').strip().upper().split())
+        occupied = collect_occupied_item_locations(pkg, exclude_placement=placement)
+        if norm_loc and norm_loc in occupied:
+            QMessageBox.warning(
+                self,
+                'Local já ocupado',
+                f'O local "{location}" já possui o item "{occupied[norm_loc]}". Cada local só pode ter um item.',
+            )
+            picker.set_code(placement.location)
+            return
         placement.location = location
         if self._on_changed:
             self._on_changed()
@@ -224,7 +256,16 @@ class ExtraItemsGroupWidget(QGroupBox):
                 f'O item "{chosen}" já está posicionado em outro local do mapa.',
             )
             return
-        self._placements.append(ExtraItemPlacement(item_id=chosen, location='PRACA-001', rarity='normal'))
+        occupied = collect_occupied_item_locations(pkg)
+        default_loc = next(
+            (
+                code
+                for code in sorted(pkg.locations.keys())
+                if code not in occupied and not code.startswith('RUA-')
+            ),
+            'PRACA-001',
+        )
+        self._placements.append(ExtraItemPlacement(item_id=chosen, location=default_loc, rarity='normal'))
         self._rebuild_rows()
         if self._on_changed:
             self._on_changed()

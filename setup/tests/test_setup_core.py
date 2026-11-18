@@ -167,6 +167,15 @@ class SetupCoreTests(unittest.TestCase):
         errors = validate_story(pkg, self.app_copy)
         self.assertTrue(any('mais de um local' in e for e in errors))
 
+        # Dois itens diferentes no mesmo local também devem falhar na validação
+        occupied_loc = pkg.collectibles[0].location
+        pkg.items['novo-item'] = Item(id='novo-item', name='Novo', image='assets/item-moeda-dourada.svg')
+        first_mission.extra_items = [
+            ExtraItemPlacement(item_id='novo-item', location=occupied_loc, rarity='normal')
+        ]
+        errors_loc = validate_story(pkg, self.app_copy)
+        self.assertTrue(any('cada local só pode ter um item' in e for e in errors_loc))
+
 
 if __name__ == '__main__':
     unittest.main()
