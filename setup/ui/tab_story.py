@@ -123,6 +123,10 @@ class StoryMetadataTab(QWidget):
             self.collectibles_editor.load_placements(pkg.collectibles)
         self._pkg = pkg
 
+    def refresh_reference_choices(self) -> None:
+        if self.collectibles_editor and self._pkg:
+            self.collectibles_editor.load_placements(self._pkg.collectibles)
+
     def _refresh_favicon(self) -> None:
         story_dir = self._story_dir_provider()
         fav = find_story_favicon(story_dir) if story_dir else None

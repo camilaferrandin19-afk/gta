@@ -97,9 +97,9 @@ class SetupMainWindow(QMainWindow):
         self.tabs = QTabWidget()
         self.tab_story = StoryMetadataTab(
             self._current_story_dir,
-            app_root=self._app_root,
+            app_root=self.app_root,
             pkg_provider=lambda: self._pkg,
-            on_data_changed=self._on_story_data_changed,
+            on_data_changed=self._mark_dirty,
         )
         self.tab_characters = CharactersTab(self._current_story_dir, on_data_changed=self._on_refs_changed)
         self.tab_items = ItemsTab(self.app_root, self._current_story_dir, on_data_changed=self._on_refs_changed)
@@ -127,6 +127,7 @@ class SetupMainWindow(QMainWindow):
             self.statusBar().showMessage(f'História "{self._pkg.id}" com alterações não salvas.')
 
     def _on_refs_changed(self) -> None:
+        self.tab_story.refresh_reference_choices()
         self.tab_missions.refresh_reference_choices()
         self._mark_dirty()
 
