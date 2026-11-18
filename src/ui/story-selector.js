@@ -14,8 +14,8 @@ export class StorySelectorController {
     this.selectedIndex = 0;
     this.onSelect = null;
     this.stories = [];
+    this._onKeyDown = (event) => this.#handleKeyDown(event);
 
-    this.#handleKeyDown = this.#handleKeyDown.bind(this);
     if (this.screen) {
       bindHoverClearsKeyboardFocus(this.screen, () => this.highlightSelection());
     }
@@ -120,13 +120,13 @@ export class StorySelectorController {
 
     this.isOpen = true;
     this.screen.classList.remove('hidden');
-    window.addEventListener('keydown', this.#handleKeyDown);
+    window.addEventListener('keydown', this._onKeyDown);
     this.highlightSelection();
   }
 
   hide() {
     this.isOpen = false;
-    window.removeEventListener('keydown', this.#handleKeyDown);
+    window.removeEventListener('keydown', this._onKeyDown);
     this.screen?.classList.add('hidden');
   }
 }
