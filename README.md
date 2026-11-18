@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./story/favicon.svg" alt="Logo GTA — Guanabara Testando Agentes" width="84" height="84">
+  <img src="./story/vibe-coding/favicon.svg" alt="Logo GTA — Guanabara Testando Agentes" width="84" height="84">
 </p>
 
 <h1 align="center">GTA (Guanabara Testando Agentes)</h1>
@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img src="./story/splash/splash-start.png" alt="Tela de abertura de GTA: Missão Vibe Coding" width="760">
+  <img src="./story/vibe-coding/splash/splash-start.png" alt="Tela de abertura de GTA: Missão Vibe Coding" width="760">
 </p>
 
 ---
@@ -24,12 +24,12 @@ Todo o motor roda diretamente no navegador, sem frameworks ou dependências exte
 
 ## A História Atual: *Missão Vibe Coding*
 
-Nesta edição, a pasta [`story/`](./story) traz a campanha **Missão Vibe Coding**.
+Nesta edição, a pasta [`story/vibe-coding/`](./story/vibe-coding) traz a campanha **Missão Vibe Coding** (e o jogo suporta múltiplas histórias selecionáveis na abertura).
 
 <table>
   <tr>
     <td width="190" align="center">
-      <img src="./story/characters/guanabara.png" alt="Personagem Guanabara" width="160">
+      <img src="./story/vibe-coding/assets/guanabara.png" alt="Personagem Guanabara" width="160">
     </td>
     <td>
       Você controla <strong>Guanabara</strong>, um motorista experiente que conhece cada rua, esquina e atalho da ilha.<br><br>
@@ -41,26 +41,71 @@ Nesta edição, a pasta [`story/`](./story) traz a campanha **Missão Vibe Codin
 
 ---
 
-## Crie Sua Própria História (Fork & Personalize)
+## Crie Sua Própria História (Setup Visual ou Markdown)
 
-Este é um projeto **Open Source** pensado para ser modificado. Você pode fazer um **fork** deste repositório e transformar o jogo em uma campanha totalmente nova — com seus próprios personagens, falas, itens, cenários e missões — editando apenas arquivos Markdown e imagens dentro de [`story/`](./story), sem precisar mexer no motor do jogo:
+Este é um projeto **Open Source** pensado para ser modificado. Você pode criar múltiplas histórias independentes sem precisar mexer no motor do jogo — usando a aplicação desktop [`setup/`](./setup) (recomendado) ou editando os arquivos em [`story/`](./story):
 
 ```text
-story/
-├── story.md              # Título, subtítulo, título da aba, lista de personagens, itens e missões
-├── favicon.svg           # Ícone da aba do navegador e do Web App (suporta .svg, .png ou .ico)
-├── npc-lines.md          # Frases aleatórias para balões HQ dos moradores na rua (até 60 caracteres)
-├── wrong-item-lines.md   # Reações genéricas ao tentar entregar um item errado (até 60 caracteres)
-├── splash/
-│   ├── splash-start.png  # Imagem da tela inicial e de compartilhamento em redes sociais
-│   └── splash-end.png    # Imagem exibida na conclusão da campanha
-├── characters/           # Fichas (.md) e retratos (.png) dos personagens das cutscenes
-├── items/                # Definições (.md) e ícones (.svg/.png) de itens de missão e extras
-├── missions/             # Roteiros das missões (.md), locais, cutscenes, escolhas e entregas
-└── map/                  # Mapeamento dos códigos da cidade (map.md) e cenários das cutscenes
+.
+├── index.html                  # Ponto de entrada do jogo em tela cheia
+├── src/                        # Motor WebGL, física, mapa, UI e carregador de histórias
+├── styles/                     # Folhas de estilo CSS3 do jogo
+├── setup/                      # Aplicação desktop local (Python + PySide6) para editar histórias
+│   ├── install.py              # Instalador multiplataforma de dependências (.venv + PySide6)
+│   ├── install-win.bat / install-mac.command / install-lnx.sh
+│   ├── setup-gta-win.bat / setup-gta-mac.command / setup-gta-lnx.sh
+│   └── main.py                 # Ponto de entrada da interface gráfica do Setup
+└── story/
+    ├── stories.json            # Catálogo das histórias exibidas na abertura do jogo
+    ├── _template/              # História modelo (não editável) usada ao criar uma nova história
+    └── vibe-coding/            # Campanha completa de exemplo ("Missão Vibe Coding")
+        ├── story.md            # Título, subtítulo, lista de personagens, itens e missões
+        ├── favicon.svg         # Ícone da aba do navegador e do Web App
+        ├── npc-lines.md        # Frases aleatórias para balões HQ dos moradores
+        ├── wrong-item-lines.md # Reações genéricas ao entregar item errado
+        ├── splash/             # splash-start.png e splash-end.png
+        ├── assets/             # Sprites (.svg), retratos de cutscene (.png), itens e logos
+        ├── characters/         # Fichas (.md) dos personagens
+        ├── items/              # Definições (.md) de itens de missão e extras no mapa
+        ├── missions/           # Roteiros das missões (.md) e encontros extras (extra-*.md)
+        └── map/                # Nomes/telhados dos códigos de 3 dígitos (map.md) e cenários POV
 ```
 
-Basta trocar os textos e imagens dessa pasta para publicar sua própria aventura no GitHub Pages!
+Quando houver **2 ou mais histórias** em `story/stories.json`, o jogo exibe automaticamente uma tela de seleção na abertura (e a opção **Trocar de história** no menu de pausa), mantendo o progresso salvo isolado por história.
+
+---
+
+## Ferramenta Desktop de Criação (`setup/`)
+
+Para criar e gerenciar histórias, missões, cutscenes, personagens, itens e telhados sem editar Markdown manualmente, utilize o aplicativo local em [`setup/`](./setup) (requer **Python 3.11+**).
+
+### Instalação e Execução por Duplo Clique
+
+Entre na pasta `setup/`:
+
+| Sistema | Instalar dependências | Abrir o Setup | Desinstalar dependências |
+|---|---|---|---|
+| **Windows** | `install-win.bat` | `setup-gta-win.bat` | `uninstall-win.bat` |
+| **macOS** | `install-mac.command` | `setup-gta-mac.command` | `uninstall-mac.command` |
+| **Linux** | `install-lnx.sh` | `setup-gta-lnx.sh` | `uninstall-lnx.sh` |
+
+*(Se abrir diretamente o `setup-gta-*` antes de instalar, ele detecta a ausência do ambiente e pergunta se deseja instalar na hora.)*
+
+### Instalação e Execução via Terminal
+
+```bash
+cd setup
+python3 install.py        # macOS / Linux (ou "py install.py" no Windows)
+python3 install.py --run  # Instala e já abre o Setup em seguida
+```
+
+### Recursos do Setup
+
+- **Gerenciador de histórias:** cria novas histórias a partir de `story/_template/`, edita metadados/splashes e mantém `story/stories.json` sincronizado.
+- **Seletor visual de mapa:** clique nos quadrados da cidade-base (códigos de 3 dígitos como `CASA-001`, `COM-001`, `PRACA-001`) com visualização do nome completo antes de confirmar.
+- **Listas fechadas e validação referencial:** impede referências quebradas ou exclusão de personagens/itens em uso.
+- **Formatação e placeholders:** atalhos para `**negrito**`, `*itálico*`, `__sublinhado__` e inserção de `[CODIGO]`, `[ITEM-id]` e `[Personagem]` (destacados automaticamente em negrito e sublinhado no jogo).
+- **Testar no Navegador:** valida, salva e abre o jogo localmente já na história em edição.
 
 ---
 
@@ -92,10 +137,11 @@ npx serve .
 
 Depois, acesse `http://localhost:8080` no navegador.
 
-Para executar a suíte de testes unitários com Node.js:
+Para executar as suítes de testes unitários (motor JS e domínio do Setup em Python):
 
 ```bash
 node --test tests/*.test.js
+python3 -m unittest discover -s setup/tests
 ```
 
 ---

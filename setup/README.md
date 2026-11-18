@@ -8,7 +8,32 @@ Aplicação desktop multiplataforma (Windows, macOS e Linux) para criar, editar 
 
 ## Instalação e execução
 
-### macOS / Linux
+### Instalação e abertura por duplo clique
+
+| Sistema | Instalar dependências | Abrir o Setup | Desinstalar dependências |
+|---|---|---|---|
+| Windows | `install-win.bat` | `setup-gta-win.bat` | `uninstall-win.bat` |
+| macOS | `install-mac.command` | `setup-gta-mac.command` | `uninstall-mac.command` |
+| Linux | `install-lnx.sh` | `setup-gta-lnx.sh` | `uninstall-lnx.sh` |
+
+### Instalação automática via terminal (Windows, macOS e Linux)
+
+Entre na pasta `setup` e execute o instalador:
+
+```bash
+cd setup
+python3 install.py        # macOS / Linux (ou "py install.py" no Windows)
+```
+
+Para instalar e já abrir a aplicação em seguida:
+
+```bash
+python3 install.py --run
+```
+
+### Instalação manual (opcional)
+
+#### macOS / Linux
 
 ```bash
 cd setup
@@ -18,7 +43,7 @@ pip install -r requirements.txt
 python3 main.py
 ```
 
-### Windows (PowerShell)
+#### Windows (PowerShell)
 
 ```powershell
 cd setup
