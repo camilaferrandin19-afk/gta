@@ -34,7 +34,7 @@ import {
 } from '../src/story/story-loader.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const storyDir = path.resolve(__dirname, '../story');
+const storyDir = path.resolve(__dirname, '../story/vibe-coding');
 
 test('carrega e valida o pacote de história de exemplo completo contra a cidade-base', () => {
   const cityMap = new CityMap();
@@ -412,7 +412,7 @@ test('registra arquivos já carregados em memória e evita recarregamento desnec
 });
 
 test('parseNpcLinesMarkdown lê falas de NPCs de story/npc-lines.md ignorando cabeçalhos e marcadores', () => {
-  const sampleDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../story');
+  const sampleDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../story/vibe-coding');
   const raw = fs.readFileSync(path.join(sampleDir, 'npc-lines.md'), 'utf-8');
   const lines = parseNpcLinesMarkdown(raw);
   assert.ok(lines.length >= 200, `esperado >= 200 falas, obtido ${lines.length}`);
@@ -497,7 +497,7 @@ right: mentor
 
 test('parseEncounterMarkdown lê encontro extra em construção e rejeita local não edificável', () => {
   const map = new CityMap();
-  const sampleDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../story');
+  const sampleDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../story/vibe-coding');
   const raw = fs.readFileSync(path.join(sampleDir, 'missions/extra-casa-hostnet.md'), 'utf-8');
   const encounter = parseEncounterMarkdown(raw, 'missions/extra-casa-hostnet.md', map);
 

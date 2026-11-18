@@ -19,7 +19,7 @@ import {
 import { collectStoryAssetUrls } from '../src/story/story-loader.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const storyDir = path.resolve(__dirname, '../story');
+const storyDir = path.resolve(__dirname, '../story/vibe-coding');
 
 test('inventário inicia com 1 página de 10 slots (2x5) e cria nova página ao passar de 10 itens', () => {
   assert.equal(INVENTORY_COLUMNS, 5);
