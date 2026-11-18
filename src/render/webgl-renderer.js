@@ -263,7 +263,7 @@ export class WebGLRenderer {
     this.#pushQuad(x - 4.5, y - 2, 9, 9, 0, 'disc', [0.22, 0.14, 0.08, 1]);
   }
 
-  renderFrame({ camera, cityMap, vehicles, boats = [], trashBins = [], pedestrians = [], player, skidMarks, bloodMarks = [], smokeParticles = [], explosions = [], worldCollectibles = [], objectivePoint, objectiveNpcPoint, completedNpcPoints = [], encounterLocations = null, emitNpcWaves = false, time }) {
+  renderFrame({ camera, cityMap, vehicles, boats = [], trashBins = [], pedestrians = [], player, playerSprites = null, skidMarks, bloodMarks = [], smokeParticles = [], explosions = [], worldCollectibles = [], objectivePoint, objectiveNpcPoint, completedNpcPoints = [], encounterLocations = null, emitNpcWaves = false, time }) {
     const gl = this.gl;
     this.quadCount = 0;
 
@@ -810,7 +810,7 @@ export class WebGLRenderer {
     }
 
     // Telhados fechados cobrem pessoas dentro dos prédios quando o jogador está fora
-    const pendingRoofLogos = [];
+    const pendingCustomQuads = [];
     for (const roof of closedRoofs) {
       const ra = roof.alpha ?? 1;
       this.#pushQuad(roof.x, roof.y, roof.w, roof.h, 0, 'roof', roof.color);
@@ -825,7 +825,19 @@ export class WebGLRenderer {
       } else if (roof.isEncounter) {
         const logoEntry = roof.roofLogo ? this.#getOrLoadLogoTexture(roof.roofLogo) : null;
         if (logoEntry && logoEntry.loaded && logoEntry.texture) {
-          pendingRoofLogos.push({ roof, entry: logoEntry, alpha: ra });
+          const maxBox = Math.min(roof.w, roof.h) * 0.62;
+          const aspect = logoEntry.width / Math.max(1, logoEntry.height);
+          const lw = aspect >= 1 ? maxBox : maxBox * aspect;
+          const lh = aspect >= 1 ? maxBox / aspect : maxBox;
+          pendingCustomQuads.push({
+            cx: roof.x + roof.w * 0.5,
+            cy: roof.y + roof.h * 0.5,
+            w: lw,
+            h: lh,
+            angle: 0,
+            entry: logoEntry,
+            alpha: ra,
+          });
         } else {
           const cx = roof.x + roof.w * 0.5;
           const cy = roof.y + roof.h * 0.5;
@@ -866,16 +878,27 @@ export class WebGLRenderer {
       const swing = !ridingMoto && player.speed > 5 && !player.ejected?.active ? Math.sin(player.walkPhase || 0) * 6 : 0;
       const cos = Math.cos(player.angle);
       const sin = Math.sin(player.angle);
-      const drawLimb = (forwardOffset, sideOffset, w, h, color) => {
+      const drawLimb = (forwardOffset, sideOffset, w, h, color, rotOffset = 0) => {
         const lx = player.x + (cos * forwardOffset - sin * sideOffset) * pScale;
         const ly = player.y + (sin * forwardOffset + cos * sideOffset) * pScale;
-        this.#pushQuad(lx - w * 0.5 * pScale, ly - h * 0.5 * pScale, w * pScale, h * pScale, player.angle, 'solid', [color[0], color[1], color[2], pAlpha]);
+        this.#pushQuad(lx - w * 0.5 * pScale, ly - h * 0.5 * pScale, w * pScale, h * pScale, player.angle + rotOffset, 'solid', [color[0], color[1], color[2], pAlpha]);
       };
+
+      const wantFallenFront = Boolean(player.isDead && !ridingMoto && playerSprites?.front);
+      const customSpriteUrl = wantFallenFront ? playerSprites.front : (playerSprites?.top || '');
+      const customSpriteEntry = customSpriteUrl ? this.#getOrLoadLogoTexture(customSpriteUrl) : null;
+      const hasCustomSprite = Boolean(customSpriteEntry && customSpriteEntry.loaded && customSpriteEntry.texture);
 
       if (ridingMoto) {
         // Braços estendidos segurando o guidão
         drawLimb(8, -7, 9, 4, [0.92, 0.72, 0.52]);
         drawLimb(8, 7, 9, 4, [0.92, 0.72, 0.52]);
+      } else if (wantFallenFront && hasCustomSprite) {
+        // Braços e pernas padrão esparramados ao cair no chão
+        drawLimb(-8.5, -4.5, 11, 5, [0.15, 0.22, 0.35], 0.2);
+        drawLimb(-8.5, 4.5, 11, 5, [0.15, 0.22, 0.35], -0.2);
+        drawLimb(3.5, -10.5, 9, 4.5, [0.92, 0.72, 0.52], -0.6);
+        drawLimb(2.5, 10.5, 9, 4.5, [0.92, 0.72, 0.52], 0.55);
       } else {
         // Pernas alternadas
         drawLimb(swing, -5, 9, 6, [0.15, 0.22, 0.35]);
@@ -885,7 +908,22 @@ export class WebGLRenderer {
         drawLimb(swing * 0.85 + 2, 11, 8, 5, [0.92, 0.72, 0.52]);
       }
 
-      this.#pushQuad(player.x - 14 * pScale, player.y - 14 * pScale, 28 * pScale, 28 * pScale, player.angle, 'player', [1, 1, 1, pAlpha]);
+      if (hasCustomSprite) {
+        const aspect = customSpriteEntry.width / Math.max(1, customSpriteEntry.height);
+        const boxH = (wantFallenFront ? 40 : 44) * pScale;
+        const boxW = boxH * aspect;
+        pendingCustomQuads.push({
+          cx: player.x,
+          cy: player.y,
+          w: boxW,
+          h: boxH,
+          angle: player.angle - Math.PI * 0.5,
+          entry: customSpriteEntry,
+          alpha: pAlpha,
+        });
+      } else {
+        this.#pushQuad(player.x - 14 * pScale, player.y - 14 * pScale, 28 * pScale, 28 * pScale, player.angle, 'player', [1, 1, 1, pAlpha]);
+      }
     }
 
     // Semáforos com luz sutil verde/vermelha emanando dos dois lados
@@ -1039,28 +1077,32 @@ export class WebGLRenderer {
     gl.bufferSubData(gl.ARRAY_BUFFER, 0, this.vertexData.subarray(0, this.quadCount * 6 * this.floatsPerVertex));
     gl.drawArrays(gl.TRIANGLES, 0, this.quadCount * 6);
 
-    if (pendingRoofLogos.length > 0) {
-      const logoVerts = new Float32Array(6 * 8);
-      for (const { roof, entry, alpha } of pendingRoofLogos) {
-        const maxBox = Math.min(roof.w, roof.h) * 0.62;
-        const aspect = entry.width / Math.max(1, entry.height);
-        const lw = aspect >= 1 ? maxBox : maxBox * aspect;
-        const lh = aspect >= 1 ? maxBox / aspect : maxBox;
-        const x0 = roof.x + (roof.w - lw) * 0.5;
-        const y0 = roof.y + (roof.h - lh) * 0.5;
-        const x1 = x0 + lw;
-        const y1 = y0 + lh;
+    if (pendingCustomQuads.length > 0) {
+      const quadVerts = new Float32Array(6 * 8);
+      for (const { cx, cy, w, h, angle, entry, alpha } of pendingCustomQuads) {
+        const hw = w * 0.5;
+        const hh = h * 0.5;
+        const cos = Math.cos(angle || 0);
+        const sin = Math.sin(angle || 0);
+        const p0x = cx + (-hw * cos - -hh * sin);
+        const p0y = cy + (-hw * sin + -hh * cos);
+        const p1x = cx + (hw * cos - -hh * sin);
+        const p1y = cy + (hw * sin + -hh * cos);
+        const p2x = cx + (hw * cos - hh * sin);
+        const p2y = cy + (hw * sin + hh * cos);
+        const p3x = cx + (-hw * cos - hh * sin);
+        const p3y = cy + (-hw * sin + hh * cos);
         const verts = [
-          x0, y0, 0, 0, 1, 1, 1, alpha,
-          x1, y0, 1, 0, 1, 1, 1, alpha,
-          x1, y1, 1, 1, 1, 1, 1, alpha,
-          x0, y0, 0, 0, 1, 1, 1, alpha,
-          x1, y1, 1, 1, 1, 1, 1, alpha,
-          x0, y1, 0, 1, 1, 1, 1, alpha,
+          p0x, p0y, 0, 0, 1, 1, 1, alpha,
+          p1x, p1y, 1, 0, 1, 1, 1, alpha,
+          p2x, p2y, 1, 1, 1, 1, 1, alpha,
+          p0x, p0y, 0, 0, 1, 1, 1, alpha,
+          p2x, p2y, 1, 1, 1, 1, 1, alpha,
+          p3x, p3y, 0, 1, 1, 1, 1, alpha,
         ];
-        logoVerts.set(verts);
+        quadVerts.set(verts);
         gl.bindTexture(gl.TEXTURE_2D, entry.texture);
-        gl.bufferSubData(gl.ARRAY_BUFFER, 0, logoVerts);
+        gl.bufferSubData(gl.ARRAY_BUFFER, 0, quadVerts);
         gl.drawArrays(gl.TRIANGLES, 0, 6);
       }
       gl.bindTexture(gl.TEXTURE_2D, this.texture);

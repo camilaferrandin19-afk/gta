@@ -854,6 +854,13 @@ export class Engine {
     );
   }
 
+  #getProtagonistSprites() {
+    const chars = this.storyPackage?.characters;
+    if (!(chars instanceof Map) || chars.size === 0) return null;
+    const firstChar = chars.values().next().value;
+    return firstChar?.sprites || null;
+  }
+
   #getMissionTargetNpcPoint() {
     const activeMission = this.storyPackage?.missions?.[this.currentMissionIndex];
     if (!activeMission?.targetLocation || !this.cityMap) return null;
@@ -2250,6 +2257,7 @@ export class Engine {
       trashBins: this.trashBins || [],
       pedestrians: this.trafficManager ? this.trafficManager.pedestrians : [],
       player: this.player,
+      playerSprites: this.#getProtagonistSprites(),
       skidMarks: this.skidMarks,
       bloodMarks: this.bloodMarks,
       smokeParticles: this.smokeParticles,
