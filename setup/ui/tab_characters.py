@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Callable
 
+from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QColorDialog,
@@ -15,6 +16,8 @@ from PySide6.QtWidgets import (
     QListWidgetItem,
     QMessageBox,
     QPushButton,
+    QScrollArea,
+    QSizePolicy,
     QSplitter,
     QVBoxLayout,
     QWidget,
@@ -65,15 +68,24 @@ class CharactersTab(QWidget):
         left_layout.addWidget(self.char_list, 1)
         left_layout.addLayout(btn_row)
 
+        right_scroll = QScrollArea()
+        right_scroll.setWidgetResizable(True)
         right_group = QGroupBox('Dados e Sprites do Personagem')
-        form = QFormLayout(right_group)
+        right_layout = QVBoxLayout(right_group)
+        right_layout.setSpacing(10)
+
+        form = QFormLayout()
         form.setSpacing(8)
+        form.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow)
+        form.setLabelAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
 
         self.id_edit = QLineEdit()
         self.id_edit.setReadOnly(True)
         self.name_edit = QLineEdit()
         self.profile_edit = QLineEdit()
         self.traits_edit = QLineEdit()
+        for w in (self.id_edit, self.name_edit, self.profile_edit, self.traits_edit):
+            w.setSizePolicy(QSizePolicy.Policy.Expanding, w.sizePolicy().verticalPolicy())
 
         self._skin_color = '#f1c27d'
         skin_row = QHBoxLayout()
@@ -113,9 +125,13 @@ class CharactersTab(QWidget):
         form.addRow('Visão direita (right):', self.right_picker)
         form.addRow('Retrato Cutscene (PNG):', self.cutscene_picker)
 
+        right_layout.addLayout(form)
+        right_layout.addStretch(1)
+        right_scroll.setWidget(right_group)
+
         splitter.addWidget(left_panel)
-        splitter.addWidget(right_group)
-        splitter.setSizes([250, 620])
+        splitter.addWidget(right_scroll)
+        splitter.setSizes([230, 640])
 
         self.name_edit.textChanged.connect(self._sync)
         self.profile_edit.textChanged.connect(self._sync)
