@@ -24,7 +24,7 @@ from .widgets import AssetPreviewWidget
 GRID_COLUMNS = 4
 
 
-class _ItemGridCard(QFrame):
+class ItemGridCard(QFrame):
     """Card clicável com a imagem de um item na grade de seleção."""
 
     def __init__(
@@ -32,25 +32,31 @@ class _ItemGridCard(QFrame):
         item: Item,
         image_path: Path | None,
         on_click: Callable[[str], None],
+        card_size: int = 104,
+        icon_size: int = 80,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
         self.item_id = item.id
         self._on_click = on_click
-        self.setFixedSize(104, 104)
+        self.setFixedSize(card_size, card_size)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setToolTip(f'{item.name or item.id} ({item.id})')
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(8, 8, 8, 8)
+        layout.setContentsMargins(6, 6, 6, 6)
         layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        preview = AssetPreviewWidget(80, parent=self)
-        preview.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
-        preview.load_file(image_path)
-        layout.addWidget(preview)
+        self.preview = AssetPreviewWidget(icon_size, parent=self)
+        self.preview.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        self.preview.load_file(image_path)
+        layout.addWidget(self.preview)
 
         self.set_selected(False)
+
+    def update_card(self, item: Item, image_path: Path | None) -> None:
+        self.setToolTip(f'{item.name or item.id} ({item.id})')
+        self.preview.load_file(image_path)
 
     def set_selected(self, selected: bool) -> None:
         if selected:
@@ -88,7 +94,7 @@ class ItemPickerDialog(QDialog):
         self.selected_item_id = (current_item_id or '').strip()
         if self.selected_item_id in self._excluded:
             self.selected_item_id = ''
-        self._cards: dict[str, _ItemGridCard] = {}
+        self._cards: dict[str, ItemGridCard] = {}
 
         self.setWindowTitle('Escolher Item')
         self.resize(520, 460)
@@ -121,7 +127,7 @@ class ItemPickerDialog(QDialog):
             if not item:
                 continue
             img_path = (self._story_dir / item.image) if item.image else None
-            card = _ItemGridCard(item, img_path, self._on_card_clicked, parent=grid_container)
+            card = ItemGridCard(item, img_path, self._on_card_clicked, parent=grid_container)
             row = idx // GRID_COLUMNS
             col = idx % GRID_COLUMNS
             grid.addWidget(card, row, col)

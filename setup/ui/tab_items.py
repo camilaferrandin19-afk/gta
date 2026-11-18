@@ -4,16 +4,17 @@ from pathlib import Path
 import re
 from typing import Callable
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QFormLayout,
+    QGridLayout,
     QGroupBox,
     QHBoxLayout,
     QInputDialog,
     QLineEdit,
-    QListWidget,
-    QListWidgetItem,
     QMessageBox,
     QPushButton,
+    QScrollArea,
     QSplitter,
     QVBoxLayout,
     QWidget,
@@ -21,10 +22,12 @@ from PySide6.QtWidgets import (
 
 from ..core.models import Item, StoryPackage
 from ..core.validator import find_dependents
+from .item_picker import ItemGridCard
 from .widgets import AssetPickerRow
 
 
 SLUG_RE = re.compile(r'^[a-z0-9]+(?:-[a-z0-9]+)*$')
+GRID_COLUMNS = 3
 
 
 class ItemsTab(QWidget):
@@ -39,9 +42,11 @@ class ItemsTab(QWidget):
     ) -> None:
         super().__init__(parent)
         self._app_root = app_root
+        self._story_dir_provider = story_dir_provider
         self._pkg: StoryPackage | None = None
         self._current_id: str | None = None
         self._on_data_changed = on_data_changed
+        self._cards: dict[str, ItemGridCard] = {}
 
         layout = QVBoxLayout(self)
         splitter = QSplitter()
@@ -49,8 +54,16 @@ class ItemsTab(QWidget):
 
         left_panel = QWidget()
         left_layout = QVBoxLayout(left_panel)
-        self.item_list = QListWidget()
-        self.item_list.currentItemChanged.connect(self._on_selected)
+
+        self.grid_scroll = QScrollArea()
+        self.grid_scroll.setWidgetResizable(True)
+        self.grid_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.grid_container = QWidget()
+        self.grid_layout = QGridLayout(self.grid_container)
+        self.grid_layout.setSpacing(8)
+        self.grid_layout.setContentsMargins(6, 6, 6, 6)
+        self.grid_layout.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
+        self.grid_scroll.setWidget(self.grid_container)
 
         btn_row = QHBoxLayout()
         self.add_btn = QPushButton('+ Novo Item')
@@ -62,12 +75,17 @@ class ItemsTab(QWidget):
         btn_row.addWidget(self.add_btn)
         btn_row.addWidget(self.del_btn)
 
-        left_layout.addWidget(self.item_list, 1)
+        left_layout.addWidget(self.grid_scroll, 1)
         left_layout.addLayout(btn_row)
 
         right_group = QGroupBox('Detalhes do Item')
-        form = QFormLayout(right_group)
-        form.setSpacing(8)
+        right_layout = QVBoxLayout(right_group)
+        right_layout.setSpacing(10)
+
+        form = QFormLayout()
+        form.setSpacing(10)
+        form.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow)
+        form.setLabelAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
 
         self.id_edit = QLineEdit()
         self.id_edit.setReadOnly(True)
@@ -80,17 +98,33 @@ class ItemsTab(QWidget):
         form.addRow('Descrição:', self.desc_edit)
         form.addRow('Imagem:', self.image_picker)
 
+        right_layout.addLayout(form)
+        right_layout.addStretch(1)
+
         splitter.addWidget(left_panel)
         splitter.addWidget(right_group)
-        splitter.setSizes([250, 620])
+        splitter.setSizes([310, 560])
 
         self.name_edit.textChanged.connect(self._sync)
         self.desc_edit.textChanged.connect(self._sync)
 
-    def load_package(self, pkg: StoryPackage | None) -> None:
+    def _item_image_path(self, item: Item) -> Path | None:
+        story_dir = self._story_dir_provider()
+        if not story_dir or not item.image:
+            return None
+        return story_dir / item.image
+
+    def _clear_grid(self) -> None:
+        self._cards.clear()
+        while self.grid_layout.count():
+            child = self.grid_layout.takeAt(0)
+            if child.widget():
+                child.widget().deleteLater()
+
+    def load_package(self, pkg: StoryPackage | None, select_id: str | None = None) -> None:
         self._pkg = pkg
         self._current_id = None
-        self.item_list.clear()
+        self._clear_grid()
         if not pkg:
             self._clear_form()
             return
@@ -98,15 +132,27 @@ class ItemsTab(QWidget):
         for iid in pkg.items:
             if iid not in ordered:
                 ordered.append(iid)
+
+        idx = 0
         for iid in ordered:
             item = pkg.items.get(iid)
             if not item:
                 continue
-            list_item = QListWidgetItem(f'{item.name} ({item.id})')
-            list_item.setData(256, iid)
-            self.item_list.addItem(list_item)
-        if self.item_list.count() > 0:
-            self.item_list.setCurrentRow(0)
+            card = ItemGridCard(
+                item,
+                self._item_image_path(item),
+                self._select_item,
+                card_size=86,
+                icon_size=64,
+                parent=self.grid_container,
+            )
+            self.grid_layout.addWidget(card, idx // GRID_COLUMNS, idx % GRID_COLUMNS)
+            self._cards[iid] = card
+            idx += 1
+
+        target_id = select_id if (select_id and select_id in self._cards) else (ordered[0] if ordered and ordered[0] in self._cards else None)
+        if target_id:
+            self._select_item(target_id)
         else:
             self._clear_form()
 
@@ -117,13 +163,14 @@ class ItemsTab(QWidget):
         self.desc_edit.clear()
         self.image_picker.set_value('')
 
-    def _on_selected(self, current: QListWidgetItem | None) -> None:
-        if not current or not self._pkg:
+    def _select_item(self, iid: str) -> None:
+        if not self._pkg:
             return
-        iid = current.data(256)
         item = self._pkg.items.get(iid)
         if not item:
             return
+        for card_id, card in self._cards.items():
+            card.set_selected(card_id == iid)
         self._current_id = None
         self.id_edit.setText(item.id)
         self.name_edit.setText(item.name)
@@ -140,9 +187,9 @@ class ItemsTab(QWidget):
         item.name = self.name_edit.text().strip()
         item.description = self.desc_edit.text().strip()
         item.image = self.image_picker.value()
-        list_item = self.item_list.currentItem()
-        if list_item:
-            list_item.setText(f'{item.name or item.id} ({item.id})')
+        card = self._cards.get(self._current_id)
+        if card:
+            card.update_card(item, self._item_image_path(item))
         if self._on_data_changed:
             self._on_data_changed()
 
@@ -162,8 +209,7 @@ class ItemsTab(QWidget):
         item = Item(id=iid, name=iid.replace('-', ' ').title())
         self._pkg.items[iid] = item
         self._pkg.items_order.append(iid)
-        self.load_package(self._pkg)
-        self.item_list.setCurrentRow(self.item_list.count() - 1)
+        self.load_package(self._pkg, select_id=iid)
         if self._on_data_changed:
             self._on_data_changed()
 
