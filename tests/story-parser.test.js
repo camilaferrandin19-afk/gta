@@ -13,6 +13,7 @@ import {
   parseMapMarkdown,
   replaceLocationCodesWithNames,
   validateAssetPath,
+  parseStoryCatalog,
   StoryParseError
 } from '../src/story/story-parser.js';
 import {
@@ -30,7 +31,8 @@ import {
   resolveStoryFaviconUrl,
   isAssetLoaded,
   clearLoadedAssets,
-  parseNpcLinesMarkdown
+  parseNpcLinesMarkdown,
+  shouldShowStorySelector,
 } from '../src/story/story-loader.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -540,6 +542,33 @@ test('parseEncounterMarkdown lê encontro extra em construção e rejeita local 
         'bad.md',
         map,
       ),
+    StoryParseError,
+  );
+});
+
+test('parseStoryCatalog valida stories.json real, entrada direta para 1 história e rejeita catálogo inválido', () => {
+  const catalogPath = path.resolve(storyDir, '../stories.json');
+  const raw = fs.readFileSync(catalogPath, 'utf8');
+  const entries = parseStoryCatalog(raw, 'stories.json');
+  assert.equal(entries.length, 1);
+  assert.equal(entries[0].id, 'vibe-coding');
+  assert.equal(entries[0].path, './story/vibe-coding');
+  assert.equal(shouldShowStorySelector(entries), false);
+
+  const twoStories = parseStoryCatalog(JSON.stringify({
+    stories: [
+      { id: 'vibe-coding', title: 'Vibe Coding' },
+      { id: 'historia-dois', title: 'História Dois', description: 'Teste' },
+    ],
+  }));
+  assert.equal(twoStories.length, 2);
+  assert.equal(twoStories[1].path, './story/historia-dois');
+  assert.equal(shouldShowStorySelector(twoStories), true);
+
+  assert.throws(() => parseStoryCatalog('{invalid', 'stories.json'), StoryParseError);
+  assert.throws(() => parseStoryCatalog('{"stories":[]}', 'stories.json'), StoryParseError);
+  assert.throws(
+    () => parseStoryCatalog(JSON.stringify({ stories: [{ id: '../hack', title: 'X' }] }), 'stories.json'),
     StoryParseError,
   );
 });
