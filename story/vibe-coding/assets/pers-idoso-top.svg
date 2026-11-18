@@ -1,3 +1,4 @@
+<?xml version='1.0' encoding='utf-8'?>
 <svg xmlns="http://www.w3.org/2000/svg" width="768" height="1024" viewBox="0 0 96 128" fill="none"><title>Otto — visão superior</title><desc>Homem idoso barbudo sem braços. Canvas e escala de exportação compatíveis com a vista frontal. Fundo transparente.</desc><defs>
     <linearGradient id="skin" x1="34" y1="19" x2="61" y2="47" gradientUnits="userSpaceOnUse">
       <stop stop-color="#FFE0AC" /><stop offset=".6" stop-color="#F1C27D" /><stop offset="1" stop-color="#DFA061" />
@@ -11,7 +12,7 @@
     <linearGradient id="pants" x1="35" y1="91" x2="60" y2="116" gradientUnits="userSpaceOnUse">
       <stop stop-color="#35455E" /><stop offset="1" stop-color="#172237" />
     </linearGradient>
-  </defs><g id="asset" transform="translate(0.000000000 0.000062500)"><g transform="translate(0.000000000 -5.658437500)"><g id="personagem" transform="translate(0.000000000 2.829187500)"><g transform="rotate(180 48 64)">
+  </defs><g id="flip-vertical" transform="matrix(1 0 0 -1 0 128)"><g id="asset" transform="translate(0.000000000 0.000062500)"><g transform="translate(0.000000000 -5.658437500)"><g id="personagem" transform="translate(0.000000000 2.829187500)"><g transform="rotate(180 48 64)">
 <defs>
  <linearGradient id="top-shirt" x1="29" y1="54" x2="66" y2="85" gradientUnits="userSpaceOnUse"><stop stop-color="#75B889" /><stop offset=".5" stop-color="#30834E" /><stop offset="1" stop-color="#1B5736" /></linearGradient>
  <linearGradient id="top-hair" x1="34" y1="45" x2="61" y2="67" gradientUnits="userSpaceOnUse"><stop stop-color="#EEF0EC" /><stop offset="1" stop-color="#939F9F" /></linearGradient>
@@ -33,4 +34,4 @@
  <path d="M31 58Q30 46 39 43L38 41Q44 40 47 41.5Q53 38.5 58 43Q65.6 46 65 58L62 65Q57 67.6 53 65Q48 68.2 43 65Q38 67 33 64Z" fill="url(#top-hair)" stroke="#758182" stroke-width=".85" stroke-linejoin="round" />
  <path d="M35 52Q37 46 43 46M46 45.5Q53 42 58 48M37 57Q43 59 48 54M51 51Q54 57 61 57M41 61Q48 64 53 60" stroke="#FFFFFF" stroke-width="1" stroke-linecap="round" opacity=".65" />
 </g>
-</g></g></g></g></svg>
+</g></g></g></g></g></svg>
