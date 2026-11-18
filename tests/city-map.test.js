@@ -9,10 +9,10 @@ test('gera cidade-base 30x30 com códigos únicos de ruas, casas, comércios e p
   assert.equal(map.blocks.length, 30);
   assert.equal(map.blocks[0].length, 30);
 
-  const rua1 = map.resolveLocationCode('RUA-01');
-  const casa1 = map.resolveLocationCode('CASA-01');
-  const com1 = map.resolveLocationCode('COM-01');
-  const praca1 = map.resolveLocationCode('PRACA-01');
+  const rua1 = map.resolveLocationCode('RUA-001');
+  const casa1 = map.resolveLocationCode('CASA-001');
+  const com1 = map.resolveLocationCode('COM-001');
+  const praca1 = map.resolveLocationCode('PRACA-001');
 
   assert.equal(rua1.type, 'road');
   assert.equal(casa1.type, 'house');
@@ -37,12 +37,12 @@ test('sinaliza erro descritivo ao resolver código de local inexistente', () => 
 
 test('identifica entrada em interior térreo pelo getLocationAt', () => {
   const map = new CityMap();
-  const casa = map.resolveLocationCode('CASA-01');
+  const casa = map.resolveLocationCode('CASA-001');
   const centerX = casa.bounds.x + casa.bounds.w * 0.5;
   const centerY = casa.bounds.y + casa.bounds.h * 0.5;
 
   const detected = map.getLocationAt(centerX, centerY);
-  assert.equal(detected?.code, 'CASA-01');
+  assert.equal(detected?.code, 'CASA-001');
 });
 
 test('gera veículos variados de cada tipo (carro, moto, van)', () => {
@@ -65,8 +65,8 @@ test('gera hospitais espalhados pela cidade com telhado branco e interior acess�
   }
 
   assert.equal(hospitals.length, 40);
-  const hosp1 = map.resolveLocationCode('HOSP-01');
-  const hosp40 = map.resolveLocationCode('HOSP-40');
+  const hosp1 = map.resolveLocationCode('HOSP-001');
+  const hosp40 = map.resolveLocationCode('HOSP-040');
   assert.equal(hosp40.type, 'hospital');
   assert.equal(hosp1.type, 'hospital');
   assert.equal(hosp1.roofColor, '#ffffff');
@@ -76,30 +76,30 @@ test('gera hospitais espalhados pela cidade com telhado branco e interior acess�
     hosp1.bounds.x + hosp1.bounds.w * 0.5,
     hosp1.bounds.y + hosp1.bounds.h * 0.5
   );
-  assert.equal(detected?.code, 'HOSP-01');
+  assert.equal(detected?.code, 'HOSP-001');
   assert.equal(detected?.type, 'hospital');
 
   // Garante que locais usados pelas missões continuam válidos
-  for (const code of ['CASA-01', 'COM-01', 'COM-24', 'COM-320', 'CASA-353', 'COM-554', 'CASA-656']) {
+  for (const code of ['CASA-001', 'COM-001', 'COM-024', 'COM-320', 'CASA-353', 'COM-554', 'CASA-656']) {
     assert.ok(map.resolveLocationCode(code));
   }
 });
 
 test('resolveItemLocation posiciona itens em praças, interiores e esquinas entre duas ruas', () => {
   const map = new CityMap();
-  const plazaPt = map.resolveItemLocation('PRACA-03');
+  const plazaPt = map.resolveItemLocation('PRACA-003');
   assert.equal(plazaPt.kind, 'plaza');
   assert.ok(Number.isFinite(plazaPt.x) && Number.isFinite(plazaPt.y));
 
-  const interiorPt = map.resolveItemLocation('HOSP-05');
+  const interiorPt = map.resolveItemLocation('HOSP-005');
   assert.equal(interiorPt.kind, 'interior');
-  assert.equal(interiorPt.code, 'HOSP-05');
+  assert.equal(interiorPt.code, 'HOSP-005');
 
-  const cornerPt = map.resolveItemLocation('RUA-04 x RUA-36 NE');
+  const cornerPt = map.resolveItemLocation('RUA-004 x RUA-036 NE');
   assert.equal(cornerPt.kind, 'corner');
   const cornerLoc = map.getLocationAt(cornerPt.x, cornerPt.y);
   assert.equal(cornerLoc?.type, 'road');
-  assert.ok(['RUA-04', 'RUA-36'].includes(cornerLoc?.code));
+  assert.ok(['RUA-004', 'RUA-036'].includes(cornerLoc?.code));
 });
 
 test('getLocationAt identifica a rua correspondente quando o jogador está na calçada', () => {
@@ -150,7 +150,7 @@ test('divide a cidade em chunks ativos com cerca de 2 veículos variados por qua
   assert.equal(map.vehicleSpawns.length, map.gridBlocks * map.gridBlocks * 2);
   assert.ok(map.vehicleSpawns.every((v) => v.driver === 'npc' && v.isParked === false));
 
-  const casa1 = map.resolveLocationCode('CASA-01');
+  const casa1 = map.resolveLocationCode('CASA-001');
   const localChunks = map.getActiveChunks(
     casa1.spawnPoint.x - 10,
     casa1.spawnPoint.y - 10,
@@ -218,7 +218,7 @@ test('computeInitialExpandedView enquadra a maior dimensão mantendo jogador e d
 
 test('getSurfaceAt diferencia asfalto, calçada e grama', () => {
   const map = new CityMap();
-  const road = map.resolveLocationCode('RUA-01');
+  const road = map.resolveLocationCode('RUA-001');
   assert.equal(map.getSurfaceAt(road.bounds.x + road.bounds.w * 0.5, road.bounds.y + road.bounds.h * 0.5), 'asphalt');
 
   const bx = map.blockXOffsets[0];
@@ -231,14 +231,14 @@ test('getSurfaceAt diferencia asfalto, calçada e grama', () => {
   assert.equal(map.getSurfaceAt(pb.x + pb.w * 0.5, pb.y + pb.h * 0.5), 'grass');
 });
 
-test('resolveIndoorOppositePosition posiciona NPC na parede oposta à porta da CASA-63', () => {
+test('resolveIndoorOppositePosition posiciona NPC na parede oposta à porta da CASA-063', () => {
   const map = new CityMap();
-  const pos = map.resolveIndoorOppositePosition('CASA-63');
+  const pos = map.resolveIndoorOppositePosition('CASA-063');
   const b = pos.building.bounds;
-  assert.equal(pos.building.code, 'CASA-63');
+  assert.equal(pos.building.code, 'CASA-063');
   assert.equal(pos.building.doorSide, 'south');
   assert.ok(pos.y < b.y + b.h * 0.5, 'NPC deve ficar na metade norte (oposta à porta sul)');
   assert.ok(pos.x >= b.x && pos.x <= b.x + b.w);
   assert.equal(pos.angle, Math.PI * 0.5);
-  assert.throws(() => map.resolveIndoorOppositePosition('RUA-04'));
+  assert.throws(() => map.resolveIndoorOppositePosition('RUA-004'));
 });

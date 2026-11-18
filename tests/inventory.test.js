@@ -97,7 +97,7 @@ test('parser de itens e missões lê story/items/ e valida entrega da caixa secr
     'missions/01-caixa-secreta.md',
     cityMap,
   );
-  assert.equal(mission1.pickupLocation, 'PRACA-01');
+  assert.equal(mission1.pickupLocation, 'PRACA-001');
   assert.equal(mission1.giveItem, 'caixa-secreta');
   assert.equal(mission1.requireItem, 'caixa-secreta');
   assert.ok(mission1.deliveryPrompt.length > 0);

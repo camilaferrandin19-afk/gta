@@ -8,6 +8,7 @@ import {
   destroySpeechBubble,
   spawnTypewriterSpeechBubble,
 } from './speech-bubble.js?v=1';
+import { renderRichText } from './rich-text.js?v=1';
 
 export class HudController {
   constructor() {
@@ -593,7 +594,7 @@ export class HudController {
     this.#cancelExpandedMapAnimations();
     this.expandedMapClosing = false;
     if (this.expandedMapObjectiveEl) {
-      this.expandedMapObjectiveEl.textContent = objectiveText || this.objectiveHintEl?.textContent || 'Exploração livre';
+      renderRichText(this.expandedMapObjectiveEl, objectiveText || this.objectiveHintEl?.textContent || 'Exploração livre');
     }
     this.expandedMapScreen.classList.remove('hidden');
   }
@@ -966,7 +967,7 @@ export class HudController {
       this.missionBannerTitleEl.textContent = `MISSÃO ${missionNumber}`;
     }
     if (this.missionBannerObjectiveEl) {
-      this.missionBannerObjectiveEl.textContent = String(objectiveText || '');
+      renderRichText(this.missionBannerObjectiveEl, String(objectiveText || ''));
     }
 
     this.missionBannerEl.classList.remove('hidden', 'visible');
@@ -1089,7 +1090,7 @@ export class HudController {
     } else {
       this.vehicleStatusEl.textContent = 'A pé';
     }
-    this.objectiveHintEl.textContent = objectiveCode ? `Destino: ${objectiveCode}` : 'Exploração livre';
+    renderRichText(this.objectiveHintEl, objectiveCode ? `Destino: ${objectiveCode}` : 'Exploração livre');
 
     const clampedHealth = Math.max(0, Math.min(100, Math.round(health)));
     this.healthValueEl.textContent = String(clampedHealth);

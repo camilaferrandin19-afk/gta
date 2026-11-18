@@ -152,6 +152,7 @@ export function parseCharacterMarkdown(rawText, fileName = 'character.md') {
       front: validateAssetPath(meta.sprite_front || '', fileName, 2),
       left: validateAssetPath(meta.sprite_left || '', fileName, 2),
       right: validateAssetPath(meta.sprite_right || '', fileName, 2),
+      cutscene: validateAssetPath(meta.sprite_cutscene || meta.cutscene_image || '', fileName, 2),
     },
   };
 }
@@ -460,6 +461,68 @@ export function parseEncounterMarkdown(rawText, fileName = 'encounter.md', cityM
   };
 }
 
+const HEX_COLOR_RE = /^#[0-9a-fA-F]{6}$/;
+
+function parseMapLineSegments(rawValue, code, fileName, lineNum) {
+  const parts = rawValue.split('|').map((part) => part.trim());
+  const name = parts[0];
+  let roofColor = '';
+  let roofLogo = '';
+
+  for (let p = 1; p < parts.length; p += 1) {
+    const segment = parts[p];
+    if (!segment) continue;
+    const eqIdx = segment.indexOf('=');
+    if (eqIdx <= 0) {
+      throw new StoryParseError(fileName, lineNum, `Atributo inválido em "${fileName}": "${segment}". Use chave=valor.`);
+    }
+    const key = segment.slice(0, eqIdx).trim().toLowerCase();
+    const val = segment.slice(eqIdx + 1).trim();
+    if (key === 'roof_color') {
+      if (code.startsWith('RUA-') || code.startsWith('PRACA-')) {
+        throw new StoryParseError(fileName, lineNum, `Local "${code}" não é edificável e não aceita roof_color.`);
+      }
+      if (!HEX_COLOR_RE.test(val)) {
+        throw new StoryParseError(fileName, lineNum, `Cor de telhado inválida ("roof_color=${val}"). Use #rrggbb.`);
+      }
+      roofColor = val.toLowerCase();
+    } else if (key === 'roof_logo') {
+      if (code.startsWith('RUA-') || code.startsWith('PRACA-')) {
+        throw new StoryParseError(fileName, lineNum, `Local "${code}" não é edificável e não aceita roof_logo.`);
+      }
+      roofLogo = validateAssetPath(val, fileName, lineNum);
+    }
+  }
+  return { name, roofColor, roofLogo };
+}
+
+export function parseMapRoofsMarkdown(rawText, fileName = 'map/map.md') {
+  const normalized = String(rawText || '').replace(/\r\n/g, '\n');
+  const lines = normalized.split('\n');
+  const roofs = new Map();
+
+  for (let i = 0; i < lines.length; i += 1) {
+    let trimmed = lines[i].trim();
+    if (!trimmed || trimmed.startsWith('#') || trimmed.startsWith('<!--')) continue;
+    if (trimmed.startsWith('- ')) {
+      trimmed = trimmed.slice(2).trim();
+    }
+    const colonIdx = trimmed.indexOf(':');
+    if (colonIdx <= 0) continue;
+    const code = trimmed.slice(0, colonIdx).trim().toUpperCase();
+    const rawValue = trimmed.slice(colonIdx + 1).trim();
+    if (!code || !rawValue) continue;
+    const { roofColor, roofLogo } = parseMapLineSegments(rawValue, code, fileName, i + 1);
+    if (roofColor || roofLogo) {
+      roofs.set(code, {
+        roofColor: roofColor || '#d6282e',
+        roofLogo: roofLogo || '',
+      });
+    }
+  }
+  return roofs;
+}
+
 export function parseMapMarkdown(rawText, fileName = 'map/map.md') {
   const normalized = String(rawText || '').replace(/\r\n/g, '\n');
   const lines = normalized.split('\n');
@@ -476,7 +539,8 @@ export function parseMapMarkdown(rawText, fileName = 'map/map.md') {
       throw new StoryParseError(fileName, i + 1, `Linha malformada em "${fileName}": "${trimmed}". Use "CODIGO: Nome".`);
     }
     const code = trimmed.slice(0, colonIdx).trim().toUpperCase();
-    const name = trimmed.slice(colonIdx + 1).trim();
+    const rawValue = trimmed.slice(colonIdx + 1).trim();
+    const { name } = parseMapLineSegments(rawValue, code, fileName, i + 1);
     if (!code || !name) {
       throw new StoryParseError(fileName, i + 1, `Código ou nome vazio em "${fileName}": "${trimmed}".`);
     }
@@ -486,13 +550,71 @@ export function parseMapMarkdown(rawText, fileName = 'map/map.md') {
   return locationNames;
 }
 
-export function replaceLocationCodesWithNames(text, locationNames) {
-  if (!text || typeof text !== 'string' || !locationNames || locationNames.size === 0) {
+const LOC_CODE_TOKEN_RE = /^(?:RUA|CASA|COM|PRACA)-\d+$/i;
+
+function findItemByToken(items, token) {
+  if (!items || !(items instanceof Map)) return null;
+  const clean = token.trim();
+  const withoutPrefix = /^item-/i.test(clean) ? clean.slice(5).trim() : '';
+  const candidates = withoutPrefix ? [withoutPrefix, clean] : [clean];
+  for (const cand of candidates) {
+    const lower = cand.toLowerCase();
+    if (items.has(cand)) return items.get(cand);
+    if (items.has(lower)) return items.get(lower);
+    for (const item of items.values()) {
+      if (String(item.id || '').toLowerCase() === lower || String(item.name || '').toLowerCase() === lower) {
+        return item;
+      }
+    }
+  }
+  return null;
+}
+
+function findCharacterByToken(characters, token) {
+  if (!characters || !(characters instanceof Map)) return null;
+  const lower = token.trim().toLowerCase();
+  if (characters.has(lower)) return characters.get(lower);
+  for (const char of characters.values()) {
+    if (String(char.id || '').toLowerCase() === lower || String(char.name || '').toLowerCase() === lower) {
+      return char;
+    }
+  }
+  return null;
+}
+
+export function replaceStoryPlaceholders(text, { locationNames = null, items = null, characters = null } = {}) {
+  if (!text || typeof text !== 'string') {
     return text;
   }
-  return text.replace(/\b((?:RUA|CASA|COM|PRACA)-\d+)\b/gi, (match, code) => {
-    const resolved = locationNames.get(code.toUpperCase());
-    return resolved || match;
+  return text.replace(/\[([^\[\]\n]+)\]/g, (match, rawToken) => {
+    const token = rawToken.trim();
+    if (!token) return match;
+
+    if (LOC_CODE_TOKEN_RE.test(token) && locationNames instanceof Map) {
+      const resolved = locationNames.get(token.toUpperCase());
+      if (resolved) return `**__${resolved}__**`;
+    }
+
+    if (/^item-/i.test(token)) {
+      const item = findItemByToken(items, token);
+      if (item?.name) return `**__${item.name}__**`;
+    }
+
+    const char = findCharacterByToken(characters, token);
+    if (char?.name) return `**__${char.name}__**`;
+
+    const itemFallback = findItemByToken(items, token);
+    if (itemFallback?.name) return `**__${itemFallback.name}__**`;
+
+    return match;
+  });
+}
+
+export function replaceLocationCodesWithNames(text, locationNames, extras = {}) {
+  return replaceStoryPlaceholders(text, {
+    locationNames,
+    items: extras?.items || null,
+    characters: extras?.characters || null,
   });
 }
 

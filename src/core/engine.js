@@ -594,7 +594,7 @@ export class Engine {
     });
   }
 
-  resetMatch(startCode = 'CASA-01', targetCode = null) {
+  resetMatch(startCode = 'CASA-001', targetCode = null) {
     this.vehicles = [];
     this.trashBins = [];
     this.activeChunkKeys = new Set();
@@ -800,8 +800,17 @@ export class Engine {
   #buildEncounterNpcs() {
     this.encounterNpcs = [];
     this.encounterLocationCodes = new Map();
+    if (!this.cityMap) return;
+    if (this.storyPackage?.mapRoofs instanceof Map) {
+      for (const [code, roof] of this.storyPackage.mapRoofs.entries()) {
+        this.encounterLocationCodes.set(code, {
+          roofColor: roof.roofColor || '#d6282e',
+          roofLogo: roof.roofLogo || '',
+        });
+      }
+    }
     const encounters = this.storyPackage?.encounters;
-    if (!this.cityMap || !Array.isArray(encounters) || encounters.length === 0) return;
+    if (!Array.isArray(encounters) || encounters.length === 0) return;
     for (const encounter of encounters) {
       try {
         const pos = this.cityMap.resolveIndoorOppositePosition(encounter.location);

@@ -5,7 +5,9 @@ import {
   parseMissionMarkdown,
   parseEncounterMarkdown,
   parseMapMarkdown,
+  parseMapRoofsMarkdown,
   replaceLocationCodesWithNames,
+  replaceStoryPlaceholders,
   validateAssetPath,
   StoryParseError,
   parseStoryCatalog,
@@ -52,11 +54,14 @@ export function getCharacterSidePngCandidates(basePath, charId, view) {
     `${cleanBase}/characters/${charId}/${charId}-${view}.png`,
     `${cleanBase}/characters/${charId}.png`,
     `${cleanBase}/characters/${charId}/${charId}.png`,
+    `${cleanBase}/assets/${charId}-${view}.png`,
+    `${cleanBase}/assets/${charId}.png`,
   ];
   if (view === 'left') {
     candidates.push(
       `${cleanBase}/characters/${charId}-right.png`,
       `${cleanBase}/characters/${charId}/${charId}-right.png`,
+      `${cleanBase}/assets/${charId}-right.png`,
     );
   }
   return candidates;
@@ -308,11 +313,19 @@ export async function loadStoryPackage(basePath = './story', cityMap = null, opt
   }
 
   let locationNames = new Map();
+  const mapRoofs = new Map();
   const mapUrl = `${cleanBase}/map/map.md`;
   const mapPromise = (async () => {
     if (await cachedExists(mapUrl)) {
       const mapRaw = await readStoryText(mapUrl, 'map/map.md');
       locationNames = parseMapMarkdown(mapRaw, 'map/map.md');
+      const rawRoofs = parseMapRoofsMarkdown(mapRaw, 'map/map.md');
+      for (const [code, roof] of rawRoofs.entries()) {
+        mapRoofs.set(code, {
+          roofColor: roof.roofColor,
+          roofLogo: roof.roofLogo ? `${cleanBase}/${roof.roofLogo}` : '',
+        });
+      }
     }
   })();
 
@@ -457,13 +470,13 @@ export async function loadStoryPackage(basePath = './story', cityMap = null, opt
       getCutsceneBackgroundCandidates(cleanBase, cutscene.background, fallbackCode),
       cachedExists,
     ));
-    cutscene.background = replaceLocationCodesWithNames(cutscene.background, locationNames);
+    cutscene.background = replaceLocationCodesWithNames(cutscene.background, locationNames, { items, characters });
     for (const step of cutscene.steps) {
-      step.text = replaceLocationCodesWithNames(step.text, locationNames);
+      step.text = replaceStoryPlaceholders(step.text, { locationNames, items, characters });
       if (step.choices) {
         for (const choice of step.choices) {
-          choice.label = replaceLocationCodesWithNames(choice.label, locationNames);
-          choice.reason = replaceLocationCodesWithNames(choice.reason, locationNames);
+          choice.label = replaceStoryPlaceholders(choice.label, { locationNames, items, characters });
+          choice.reason = replaceStoryPlaceholders(choice.reason, { locationNames, items, characters });
         }
       }
     }
@@ -495,15 +508,15 @@ export async function loadStoryPackage(basePath = './story', cityMap = null, opt
         ),
       );
 
-      mission.objective = replaceLocationCodesWithNames(mission.objective, locationNames);
+      mission.objective = replaceStoryPlaceholders(mission.objective, { locationNames, items, characters });
       if (mission.pickupObjective) {
-        mission.pickupObjective = replaceLocationCodesWithNames(mission.pickupObjective, locationNames);
+        mission.pickupObjective = replaceStoryPlaceholders(mission.pickupObjective, { locationNames, items, characters });
       }
       if (mission.deliveryPrompt) {
-        mission.deliveryPrompt = replaceLocationCodesWithNames(mission.deliveryPrompt, locationNames);
+        mission.deliveryPrompt = replaceStoryPlaceholders(mission.deliveryPrompt, { locationNames, items, characters });
       }
       if (mission.wrongItemMessage) {
-        mission.wrongItemMessage = replaceLocationCodesWithNames(mission.wrongItemMessage, locationNames);
+        mission.wrongItemMessage = replaceStoryPlaceholders(mission.wrongItemMessage, { locationNames, items, characters });
       }
       loadedMissions += 1;
       reportProgress(
@@ -528,7 +541,7 @@ export async function loadStoryPackage(basePath = './story', cityMap = null, opt
       }
       await hydrateCutscene(encounter.cutscene, encounter.location, encounterFile);
       if (encounter.prompt) {
-        encounter.prompt = replaceLocationCodesWithNames(encounter.prompt, locationNames);
+        encounter.prompt = replaceStoryPlaceholders(encounter.prompt, { locationNames, items, characters });
       }
       if (encounter.roofLogo) {
         encounter.roofLogo = withBust(`${cleanBase}/${encounter.roofLogo}`);
@@ -542,9 +555,9 @@ export async function loadStoryPackage(basePath = './story', cityMap = null, opt
   );
 
   return {
-    title: replaceLocationCodesWithNames(manifest.title, locationNames),
-    pageTitle: replaceLocationCodesWithNames(manifest.pageTitle || manifest.title, locationNames),
-    subtitle: replaceLocationCodesWithNames(manifest.subtitle, locationNames),
+    title: replaceStoryPlaceholders(manifest.title, { locationNames, items, characters }),
+    pageTitle: replaceStoryPlaceholders(manifest.pageTitle || manifest.title, { locationNames, items, characters }),
+    subtitle: replaceStoryPlaceholders(manifest.subtitle, { locationNames, items, characters }),
     splashUrl: withBust(splashUrl),
     faviconUrl: withBust(faviconUrl),
     npcLines,
@@ -554,6 +567,7 @@ export async function loadStoryPackage(basePath = './story', cityMap = null, opt
     missions,
     encounters,
     locationNames,
+    mapRoofs,
   };
 }
 
@@ -587,6 +601,11 @@ export function collectStoryAssetUrls(storyPackage) {
           if (bgUrl) urls.add(bgUrl);
         }
       }
+    }
+  }
+  if (storyPackage.mapRoofs instanceof Map) {
+    for (const roof of storyPackage.mapRoofs.values()) {
+      if (roof?.roofLogo) urls.add(roof.roofLogo);
     }
   }
   for (const encounter of storyPackage.encounters || []) {

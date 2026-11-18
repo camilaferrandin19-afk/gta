@@ -18,7 +18,7 @@ import {
 
 test('colisão sólida impede jogador a pé de atravessar parede de edificação', () => {
   const map = new CityMap();
-  const casa = map.resolveLocationCode('CASA-01');
+  const casa = map.resolveLocationCode('CASA-001');
   const wall = casa.interior.walls[0];
 
   const player = {
@@ -38,7 +38,7 @@ test('colisão sólida impede jogador a pé de atravessar parede de edificação
 
 test('carros, motos e vans têm resposta distinta e ativam drift em curvas em velocidade', () => {
   const map = new CityMap();
-  const road = map.resolveLocationCode('RUA-01');
+  const road = map.resolveLocationCode('RUA-001');
 
   const car = createVehicleEntity({ id: 'v1', kind: 'car', model: 'Sedan', color: '#f00', x: 500, y: road.bounds.y + 64, angle: 0 });
   const moto = createVehicleEntity({ id: 'v2', kind: 'moto', model: 'Street', color: '#0f0', x: 900, y: road.bounds.y + 64, angle: 0 });
@@ -69,7 +69,7 @@ test('carros, motos e vans têm resposta distinta e ativam drift em curvas em ve
 
 test('saída do veículo posiciona o jogador em local livre adjacente', () => {
   const map = new CityMap();
-  const road = map.resolveLocationCode('RUA-01');
+  const road = map.resolveLocationCode('RUA-001');
   const car = createVehicleEntity({ id: 'v1', kind: 'car', model: 'Sedan', color: '#f00', x: 600, y: road.bounds.y + 64, angle: 0 });
 
   const exitPos = findSafeExitPosition(car, 11, map);
@@ -78,7 +78,7 @@ test('saída do veículo posiciona o jogador em local livre adjacente', () => {
 
 test('jogador a pé colide de forma sólida com veículos e não passa por cima deles', () => {
   const map = new CityMap();
-  const road = map.resolveLocationCode('RUA-01');
+  const road = map.resolveLocationCode('RUA-001');
   const car = createVehicleEntity({ id: 'v1', kind: 'car', model: 'Sedan', color: '#f00', x: 700, y: road.bounds.y + 64, angle: 0 });
   const player = { x: car.x - 40, y: car.y, angle: 0, speed: 0, radius: 11 };
 
@@ -91,7 +91,7 @@ test('jogador a pé colide de forma sólida com veículos e não passa por cima 
 
 test('veículo não pode entrar pela porta de uma construção', () => {
   const map = new CityMap();
-  const house = map.resolveLocationCode('CASA-01');
+  const house = map.resolveLocationCode('CASA-001');
   const doorCenterX = house.entrance.x + house.entrance.w * 0.5;
   const moto = createVehicleEntity({
     id: 'm1',
@@ -167,7 +167,7 @@ test('lixeiras substituem postes, são arremessadas, rebatem em obstáculos e n�
   assert.equal(car.health, 100);
 
   // Testa rebote contra parede de uma construção
-  const house = map.resolveLocationCode('CASA-01');
+  const house = map.resolveLocationCode('CASA-001');
   const bounceBin = createTrashBinEntity({
     id: 'bin-bounce',
     x: house.bounds.x - 10,
@@ -198,7 +198,7 @@ test('colisão com personagem de missão bloqueia o jogador sem empurrar o NPC',
 
 test('aceleração do veículo cresce progressivamente conforme o tempo segurando o acelerador', () => {
   const map = new CityMap();
-  const road = map.resolveLocationCode('RUA-01');
+  const road = map.resolveLocationCode('RUA-001');
   const car = createVehicleEntity({
     id: 'CAR-ACCEL',
     kind: 'car',

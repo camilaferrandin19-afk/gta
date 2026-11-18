@@ -29,7 +29,6 @@ function waitMs(ms) {
 }
 
 async function boot() {
-  window.__gameBooted = true;
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('./sw.js').catch(() => {});
   }
@@ -40,6 +39,7 @@ async function boot() {
   const pauseMenu = new PauseMenuController(confirmDialog, assetsRefreshDialog);
   const storySelector = new StorySelectorController();
   const inventoryController = new InventoryController();
+  window.__gameBooted = true;
   const canvas = document.getElementById('game-canvas');
   const minimapCanvas = document.getElementById('minimap-canvas');
   const touchControls = document.getElementById('touch-controls');
@@ -294,7 +294,7 @@ async function boot() {
     const signal = assetsRefreshDialog.open();
     try {
       const result = await refreshAllStoryAssets({
-        basePath: './story',
+        basePath: selectedStory?.path || './story/vibe-coding',
         cityMap,
         preloadedUrls,
         signal,
