@@ -13,20 +13,20 @@ wrong_item_message: Esse não é o [ITEM-item-chave]! Tente novamente.
 ---
 
 ## CUTSCENE_INICIO
-left: protagonista
-right: contato
+left: personagem-01
+right: personagem-02
 bg: Frente da CASA-001
 
 - Protagonista: Aqui vai a fala inicial do personagem principal com **negrito**, *itálico* e __sublinhado__.
 - Contato: Aqui vai a resposta de [Contato] pedindo para ir até [PRACA-001] e depois para [COM-001].
 - LINK: Abrir link de exemplo -> https://example.com
 - OPCAO: Aqui vai uma opção que avança a missão -> NEXT
-- OPCAO: Aqui vai uma opção que causa derrota -> FAIL: Exemplo de derrota por escolha na cutscene.
+- OPCAO: Aqui vai uma opção que causa derrota -> GAMEOVER: Exemplo de derrota por escolha na cutscene.
 - Contato: Ótimo! Pegue [ITEM-item-chave] em [PRACA-001] e leve até [COM-001].
 
 ## CUTSCENE_FIM
-left: protagonista
-right: contato
+left: personagem-01
+right: personagem-02
 bg: Interior do COM-001
 
 - Contato: Aqui vai a fala final de [Contato] recebendo o item em [COM-001].

@@ -78,7 +78,7 @@ class CutsceneStepDialog(QDialog):
 
         self.text_edit = RichTextLineWidget(app_root, pkg_provider, placeholder='Use B/I/U ou + Local / + Item / + Personagem')
         self.choice_target_combo = QComboBox()
-        self.choice_target_combo.addItems(['NEXT', 'FAIL'])
+        self.choice_target_combo.addItems(['NEXT', 'COMPLETE', 'GAMEOVER'])
         self.url_edit = QLineEdit()
         self.url_edit.setPlaceholderText('https://...')
         self.reason_edit = QLineEdit()
@@ -89,7 +89,7 @@ class CutsceneStepDialog(QDialog):
         self.form.addRow('Texto / Rótulo:', self.text_edit)
         self.form.addRow('Destino (escolha):', self.choice_target_combo)
         self.form.addRow('URL (link):', self.url_edit)
-        self.form.addRow('Motivo falha (FAIL):', self.reason_edit)
+        self.form.addRow('Motivo derrota (GAMEOVER):', self.reason_edit)
 
         layout.addLayout(self.form)
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
@@ -136,7 +136,7 @@ class CutsceneStepDialog(QDialog):
         self._set_row_visible(self.text_edit, kind in ('line', 'choice', 'link'))
         self._set_row_visible(self.choice_target_combo, kind == 'choice')
         self._set_row_visible(self.url_edit, kind == 'link')
-        is_fail = kind == 'choice' and self.choice_target_combo.currentText() == 'FAIL'
+        is_fail = kind == 'choice' and self.choice_target_combo.currentText() == 'GAMEOVER'
         self._set_row_visible(self.reason_edit, is_fail)
 
     def to_step(self) -> CutsceneStep:
@@ -163,7 +163,7 @@ class CutsceneStepDialog(QDialog):
             kind='choice',
             text=self.text_edit.text().strip(),
             target=target,
-            reason=self.reason_edit.text().strip() if target == 'FAIL' else '',
+            reason=self.reason_edit.text().strip() if target == 'GAMEOVER' else '',
         )
 
 
@@ -261,7 +261,7 @@ class CutsceneEditorWidget(QGroupBox):
             self.table.setItem(row, 0, QTableWidgetItem(step.kind))
             self.table.setItem(row, 1, QTableWidgetItem(step.speaker))
             self.table.setItem(row, 2, QTableWidgetItem(step.text))
-            dest = f'FAIL: {step.reason}' if step.target == 'FAIL' and step.reason else step.target
+            dest = f'GAMEOVER: {step.reason}' if step.target == 'GAMEOVER' and step.reason else step.target
             self.table.setItem(row, 3, QTableWidgetItem(dest if step.kind in ('choice', 'link') else ''))
 
     def _sync_meta(self) -> None:

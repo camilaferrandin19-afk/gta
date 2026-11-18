@@ -28,6 +28,7 @@ from ..core.story_io import (
     save_story_package,
 )
 from ..core.validator import validate_story
+from .new_story_dialog import NewStoryDialog
 from .tab_characters import CharactersTab
 from .tab_items import ItemsTab
 from .tab_map import MapLocationsTab
@@ -100,11 +101,11 @@ class SetupMainWindow(QMainWindow):
         self.tab_missions = MissionsAndEncountersTab(self.app_root, on_data_changed=self._mark_dirty)
         self.tab_map = MapLocationsTab(self.app_root, self._current_story_dir, on_data_changed=self._mark_dirty)
 
-        self.tabs.addTab(self.tab_story, 'História & Abertura')
+        self.tabs.addTab(self.tab_story, 'História')
         self.tabs.addTab(self.tab_characters, 'Personagens')
         self.tabs.addTab(self.tab_items, 'Itens')
-        self.tabs.addTab(self.tab_missions, 'Missões & Encontros')
-        self.tabs.addTab(self.tab_map, 'Mapa & Telhados')
+        self.tabs.addTab(self.tab_missions, 'Missões')
+        self.tabs.addTab(self.tab_map, 'Mapa')
         root_layout.addWidget(self.tabs, 1)
 
         self.setStatusBar(QStatusBar())
@@ -168,14 +169,15 @@ class SetupMainWindow(QMainWindow):
         self.statusBar().showMessage(f'História "{self._pkg.title}" ({self._pkg.id}) carregada.')
 
     def _on_new_story(self) -> None:
-        raw_id, ok1 = QInputDialog.getText(self, 'Nova História', 'Identificador da pasta (ex.: minha-aventura):')
-        if not ok1 or not raw_id.strip():
-            return
-        title, ok2 = QInputDialog.getText(self, 'Nova História', 'Título da história:', text=raw_id.strip().title())
-        if not ok2:
+        dlg = NewStoryDialog(self.app_root, parent=self)
+        if dlg.exec() != dlg.DialogCode.Accepted:
             return
         try:
-            pkg = create_story(self.app_root, raw_id.strip(), title.strip())
+            pkg = create_story(
+                self.app_root,
+                dlg.story_id(),
+                dlg.story_title(),
+            )
         except StoryIOError as err:
             QMessageBox.warning(self, 'Não foi possível criar', str(err))
             return

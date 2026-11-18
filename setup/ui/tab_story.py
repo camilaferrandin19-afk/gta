@@ -4,16 +4,21 @@ from pathlib import Path
 from typing import Callable
 
 from PySide6.QtWidgets import (
+    QFileDialog,
     QFormLayout,
     QGroupBox,
+    QHBoxLayout,
     QLineEdit,
+    QMessageBox,
     QPlainTextEdit,
+    QPushButton,
     QVBoxLayout,
     QWidget,
 )
 
 from ..core.models import StoryPackage
-from .widgets import AssetPickerRow
+from ..core.story_io import StoryIOError, apply_story_favicon, find_story_favicon
+from .widgets import AssetPickerRow, AssetPreviewWidget
 
 
 class StoryMetadataTab(QWidget):
@@ -21,6 +26,7 @@ class StoryMetadataTab(QWidget):
 
     def __init__(self, story_dir_provider: Callable[[], Path | None], parent: QWidget | None = None) -> None:
         super().__init__(parent)
+        self._story_dir_provider = story_dir_provider
         self._pkg: StoryPackage | None = None
 
         root = QVBoxLayout(self)
@@ -41,11 +47,24 @@ class StoryMetadataTab(QWidget):
         self.splash_picker = AssetPickerRow(story_dir_provider, subdir='splash')
         self.splash_end_picker = AssetPickerRow(story_dir_provider, subdir='splash', allow_clear=True)
 
+        favicon_row = QHBoxLayout()
+        favicon_row.setSpacing(8)
+        self.favicon_preview = AssetPreviewWidget(48, parent=self)
+        self.favicon_edit = QLineEdit()
+        self.favicon_edit.setReadOnly(True)
+        self.favicon_edit.setPlaceholderText('Nenhum favicon na raiz')
+        self.favicon_btn = QPushButton('Alterar...')
+        self.favicon_btn.clicked.connect(self._on_change_favicon)
+        favicon_row.addWidget(self.favicon_preview)
+        favicon_row.addWidget(self.favicon_edit, 1)
+        favicon_row.addWidget(self.favicon_btn)
+
         form.addRow('Identificador:', self.id_edit)
         form.addRow('Título no jogo:', self.title_edit)
         form.addRow('Título da aba:', self.page_title_edit)
         form.addRow('Subtítulo:', self.subtitle_edit)
         form.addRow('Descrição:', self.desc_edit)
+        form.addRow('Favicon (.svg / .png):', favicon_row)
         form.addRow('Imagem de abertura:', self.splash_picker)
         form.addRow('Imagem de fim:', self.splash_end_picker)
 
@@ -67,6 +86,9 @@ class StoryMetadataTab(QWidget):
             self.desc_edit.clear()
             self.splash_picker.set_value('')
             self.splash_end_picker.set_value('')
+            self.favicon_preview.load_file(None)
+            self.favicon_edit.clear()
+            self.favicon_btn.setEnabled(False)
             return
 
         self.id_edit.setText(pkg.id)
@@ -76,7 +98,34 @@ class StoryMetadataTab(QWidget):
         self.desc_edit.setPlainText(pkg.body_description)
         self.splash_picker.set_value(pkg.splash)
         self.splash_end_picker.set_value(pkg.splash_end)
+        self.favicon_btn.setEnabled(True)
+        self._refresh_favicon()
         self._pkg = pkg
+
+    def _refresh_favicon(self) -> None:
+        story_dir = self._story_dir_provider()
+        fav = find_story_favicon(story_dir) if story_dir else None
+        self.favicon_preview.load_file(fav)
+        self.favicon_edit.setText(fav.name if fav else '')
+
+    def _on_change_favicon(self) -> None:
+        story_dir = self._story_dir_provider()
+        if not story_dir:
+            return
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            'Alterar Favicon (.svg ou .png)',
+            str(story_dir),
+            'Ícones (*.svg *.png)',
+        )
+        if not file_path:
+            return
+        try:
+            apply_story_favicon(story_dir, Path(file_path))
+        except StoryIOError as err:
+            QMessageBox.warning(self, 'Erro ao alterar favicon', str(err))
+            return
+        self._refresh_favicon()
 
     def flush(self) -> None:
         self._sync()

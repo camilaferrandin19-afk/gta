@@ -205,9 +205,11 @@ def _parse_cutscene_block(name: str, lines: list[str]) -> CutsceneBlock:
                     label, target = payload.split('->', 1)
                     target = target.strip()
                     reason = ''
-                    if ':' in target and target.upper().startswith('FAIL:'):
+                    if ':' in target and target.upper().startswith(('GAMEOVER:', 'FAIL:')):
                         _, reason = target.split(':', 1)
-                        target = 'FAIL'
+                        target = 'GAMEOVER'
+                    elif target.upper() in ('GAMEOVER', 'FAIL'):
+                        target = 'GAMEOVER'
                     block.steps.append(CutsceneStep(
                         kind='choice',
                         text=label.strip(),
@@ -244,8 +246,12 @@ def _serialize_cutscene_block(block: CutsceneBlock) -> str:
         if step.kind == 'line':
             lines.append(f'- {step.speaker}: {step.text}')
         elif step.kind == 'choice':
-            if step.target.upper() == 'FAIL' and step.reason:
-                lines.append(f'- OPCAO: {step.text} -> FAIL: {step.reason}')
+            target_up = (step.target or 'NEXT').upper()
+            if target_up in ('GAMEOVER', 'FAIL'):
+                if step.reason:
+                    lines.append(f'- OPCAO: {step.text} -> GAMEOVER: {step.reason}')
+                else:
+                    lines.append(f'- OPCAO: {step.text} -> GAMEOVER')
             else:
                 lines.append(f'- OPCAO: {step.text} -> {step.target or "NEXT"}')
         elif step.kind == 'deliver':

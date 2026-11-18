@@ -40,8 +40,8 @@ class SetupCoreTests(unittest.TestCase):
 
     def test_load_and_validate_existing_vibe_coding_story(self) -> None:
         catalog = load_catalog(self.app_copy)
-        self.assertEqual(len(catalog), 1)
-        self.assertEqual(catalog[0].id, 'vibe-coding')
+        self.assertGreaterEqual(len(catalog), 1)
+        self.assertIn('vibe-coding', [e.id for e in catalog])
 
         pkg = load_story_package(self.app_copy, 'vibe-coding')
         self.assertEqual(pkg.title, 'GTA: Missão Vibe Coding')
@@ -57,6 +57,7 @@ class SetupCoreTests(unittest.TestCase):
         template_pkg = load_story_package(self.app_copy, '_template')
         self.assertEqual(validate_story(template_pkg, self.app_copy), [])
 
+        initial_ids = [e.id for e in load_catalog(self.app_copy)]
         pkg = create_story(self.app_copy, 'aventura-teste', 'Aventura de Teste', 'Descrição teste')
         self.assertEqual(pkg.id, 'aventura-teste')
         self.assertIn('01-exemplo', pkg.missions)
@@ -66,7 +67,7 @@ class SetupCoreTests(unittest.TestCase):
         self.assertEqual(validate_story(pkg, self.app_copy), [])
 
         catalog = load_catalog(self.app_copy)
-        self.assertEqual([e.id for e in catalog], ['vibe-coding', 'aventura-teste'])
+        self.assertEqual([e.id for e in catalog], initial_ids + ['aventura-teste'])
 
         pkg.title = 'Aventura Editada'
         save_story_package(self.app_copy, pkg)
@@ -75,7 +76,7 @@ class SetupCoreTests(unittest.TestCase):
 
         delete_story(self.app_copy, 'aventura-teste')
         catalog_after = load_catalog(self.app_copy)
-        self.assertEqual([e.id for e in catalog_after], ['vibe-coding'])
+        self.assertEqual([e.id for e in catalog_after], initial_ids)
         self.assertFalse((self.app_copy / 'story' / 'aventura-teste').exists())
 
     def test_find_dependents_blocks_unsafe_deletion_and_validate_catches_broken_refs(self) -> None:

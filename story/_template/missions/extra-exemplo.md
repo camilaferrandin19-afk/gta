@@ -1,17 +1,17 @@
 ---
 id: extra-exemplo
-npc: contato
+npc: personagem-03
 location: CASA-002
-prompt: Conversar em [CASA-002]
+prompt: Conversar com [Mentor] em [CASA-002]
 roof_color: #2563eb
 roof_logo: assets/logo-exemplo.svg
 ---
 
 ## CUTSCENE
-left: protagonista
-right: contato
+left: personagem-01
+right: personagem-03
 bg: Interior da CASA-002
 
-- Contato: Aqui vai a fala repetível de um encontro extra dentro de [CASA-002].
-- Protagonista: Aqui vai a resposta do personagem principal no encontro extra.
+- Mentor: Seja bem-vindo à [CASA-002]! Sempre tenho boas histórias e conselhos para quem passa por aqui.
+- Protagonista: Obrigado, [Mentor]! Vou ficar atento a tudo o que acontece pela cidade.
 - LINK: Ver documentação de exemplo -> https://example.com

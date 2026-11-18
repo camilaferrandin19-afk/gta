@@ -242,7 +242,13 @@ def save_story_package(app_root: Path, pkg: StoryPackage) -> None:
     save_catalog(app_root, entries)
 
 
-def create_story(app_root: Path, story_id: str, title: str, description: str = '') -> StoryPackage:
+def create_story(
+    app_root: Path,
+    story_id: str,
+    title: str,
+    description: str = '',
+    favicon_source: Path | None = None,
+) -> StoryPackage:
     clean_id = (story_id or '').strip().lower()
     if clean_id == '_template' or not STORY_ID_RE.match(clean_id):
         raise StoryIOError('Identificador inválido. Use apenas letras minúsculas, números e hífen.')
@@ -250,9 +256,16 @@ def create_story(app_root: Path, story_id: str, title: str, description: str = '
     if story_dir.exists():
         raise StoryIOError(f'Já existe uma história com o identificador "{clean_id}".')
 
+    if favicon_source is not None:
+        if not favicon_source.is_file():
+            raise StoryIOError(f'Favicon não encontrado: "{favicon_source}".')
+        if favicon_source.suffix.lower() not in ('.svg', '.png'):
+            raise StoryIOError('O favicon deve ser um arquivo .svg ou .png.')
+
     template_dir = app_root / 'story' / '_template'
     if template_dir.is_dir():
         shutil.copytree(template_dir, story_dir)
+        apply_story_favicon(story_dir, favicon_source)
         pkg = load_story_package(app_root, clean_id)
         clean_title = title.strip() or clean_id
         clean_desc = description.strip() or pkg.body_description
@@ -351,7 +364,36 @@ def create_story(app_root: Path, story_id: str, title: str, description: str = '
         locations=locations,
     )
     save_story_package(app_root, pkg)
+    apply_story_favicon(story_dir, favicon_source)
     return pkg
+
+
+def find_story_favicon(story_dir: Path) -> Path | None:
+    """Retorna o arquivo de favicon ativo na raiz da história na ordem do carregador."""
+    for name in ('favicon.svg', 'favicon.png', 'favicon.ico'):
+        candidate = story_dir / name
+        if candidate.is_file():
+            return candidate
+    return None
+
+
+def apply_story_favicon(story_dir: Path, favicon_source: Path | None) -> Path | None:
+    """Instala um favicon .svg ou .png na raiz da história, removendo formatos conflitantes."""
+    if favicon_source is None:
+        return find_story_favicon(story_dir)
+    if not favicon_source.is_file():
+        raise StoryIOError(f'Favicon não encontrado: "{favicon_source}".')
+    ext = favicon_source.suffix.lower()
+    if ext not in ('.svg', '.png'):
+        raise StoryIOError('O favicon deve ser um arquivo .svg ou .png.')
+    for name in ('favicon.svg', 'favicon.png', 'favicon.ico'):
+        old = story_dir / name
+        if old.is_file() and name != f'favicon{ext}':
+            old.unlink()
+    target = story_dir / f'favicon{ext}'
+    if favicon_source.resolve() != target.resolve():
+        shutil.copy2(favicon_source, target)
+    return target
 
 
 def delete_story(app_root: Path, story_id: str) -> None:
