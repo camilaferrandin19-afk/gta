@@ -151,11 +151,27 @@ export class WebGLRenderer {
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+      const natW = img.naturalWidth || img.width || 256;
+      const natH = img.naturalHeight || img.height || 256;
+      let uploadSource = img;
+      if (/\.svg(\?|$)/i.test(url) && typeof document !== 'undefined') {
+        const aspect = natW / Math.max(1, natH);
+        const targetW = 256;
+        const targetH = Math.max(1, Math.round(256 / Math.max(0.1, aspect)));
+        const raster = document.createElement('canvas');
+        raster.width = targetW;
+        raster.height = targetH;
+        const ctx = raster.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, targetW, targetH);
+          uploadSource = raster;
+        }
+      }
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, uploadSource);
       gl.bindTexture(gl.TEXTURE_2D, this.texture);
       entry.texture = tex;
-      entry.width = img.naturalWidth || img.width || 1;
-      entry.height = img.naturalHeight || img.height || 1;
+      entry.width = natW;
+      entry.height = natH;
       entry.loaded = true;
     };
     img.onerror = () => {
@@ -911,7 +927,7 @@ export class WebGLRenderer {
 
       if (hasCustomSprite) {
         const aspect = customSpriteEntry.width / Math.max(1, customSpriteEntry.height);
-        const boxH = (wantFallenFront ? 40 : 44) * pScale;
+        const boxH = (wantFallenFront ? 48 : 56) * pScale;
         const boxW = boxH * aspect;
         pendingCustomQuads.push({
           cx: player.x,
