@@ -2,207 +2,207 @@
 # Mapa da Cidade
 
 ## Ruas
-RUA-01: Av. Aurélio Valporto
-RUA-02: Rua dos Guararapes
-RUA-03: Rua Sete de Setembro
-RUA-04: Av. Brasil
-RUA-05: Rua Marechal Deodoro
-RUA-06: Rua XV de Novembro
-RUA-07: Av. Getúlio Vargas
-RUA-08: Rua Tiradentes
-RUA-09: Rua Rui Barbosa
-RUA-10: Rua Duque de Caxias
-RUA-11: Av. Paulista
-RUA-12: Rua das Flores
-RUA-13: Rua da Praia
-RUA-14: Rua São José
-RUA-15: Rua Santa Catarina
-RUA-16: Av. Beira-Mar
-RUA-17: Rua dos Bandeirantes
-RUA-18: Rua Dom Pedro II
-RUA-19: Rua Barão do Rio Branco
-RUA-20: Rua Almirante Tamandaré
-RUA-21: Av. Independência
-RUA-22: Rua Floriano Peixoto
-RUA-23: Rua Gonçalves Dias
-RUA-24: Rua Castro Alves
-RUA-25: Rua Machado de Assis
-RUA-26: Av. das Palmeiras
-RUA-27: Rua dos Pinheiros
-RUA-28: Rua das Acácias
-RUA-29: Rua dos Ipês
-RUA-30: Rua das Laranjeiras
-RUA-31: Av. Atlântica
-RUA-32: Rua do Comércio
-RUA-33: Rua da Liberdade
-RUA-34: Rua Boa Vista
-RUA-35: Rua Bela Vista
-RUA-36: Rua São Paulo
-RUA-37: Rua Rio de Janeiro
-RUA-38: Rua Minas Gerais
-RUA-39: Rua Bahia
-RUA-40: Rua Pernambuco
-RUA-41: Rua Paraná
-RUA-42: Rua Ceará
-RUA-43: Rua Amazonas
-RUA-44: Rua Goiás
-RUA-45: Rua Alagoas
-RUA-46: Av. dos Trabalhadores
-RUA-47: Rua da Saudade
-RUA-48: Rua da Esperança
-RUA-49: Rua da Paz
-RUA-50: Rua da Alegria
-RUA-51: Rua Carlos Gomes
-RUA-52: Rua Villa-Lobos
-RUA-53: Rua Santos Dumont
-RUA-54: Rua Oswaldo Cruz
-RUA-55: Rua José Bonifácio
-RUA-56: Av. Presidente Kennedy
-RUA-57: Rua Visconde de Mauá
-RUA-58: Rua General Osório
-RUA-59: Rua Padre Anchieta
-RUA-60: Rua Frei Caneca
-RUA-61: Rua Marquês de Itu
-RUA-62: Av. do Contorno
+RUA-001: Av. Aurélio Valporto
+RUA-002: Rua dos Guararapes
+RUA-003: Rua Sete de Setembro
+RUA-004: Av. Brasil
+RUA-005: Rua Marechal Deodoro
+RUA-006: Rua XV de Novembro
+RUA-007: Av. Getúlio Vargas
+RUA-008: Rua Tiradentes
+RUA-009: Rua Rui Barbosa
+RUA-010: Rua Duque de Caxias
+RUA-011: Av. Paulista
+RUA-012: Rua das Flores
+RUA-013: Rua da Praia
+RUA-014: Rua São José
+RUA-015: Rua Santa Catarina
+RUA-016: Av. Beira-Mar
+RUA-017: Rua dos Bandeirantes
+RUA-018: Rua Dom Pedro II
+RUA-019: Rua Barão do Rio Branco
+RUA-020: Rua Almirante Tamandaré
+RUA-021: Av. Independência
+RUA-022: Rua Floriano Peixoto
+RUA-023: Rua Gonçalves Dias
+RUA-024: Rua Castro Alves
+RUA-025: Rua Machado de Assis
+RUA-026: Av. das Palmeiras
+RUA-027: Rua dos Pinheiros
+RUA-028: Rua das Acácias
+RUA-029: Rua dos Ipês
+RUA-030: Rua das Laranjeiras
+RUA-031: Av. Atlântica
+RUA-032: Rua do Comércio
+RUA-033: Rua da Liberdade
+RUA-034: Rua Boa Vista
+RUA-035: Rua Bela Vista
+RUA-036: Rua São Paulo
+RUA-037: Rua Rio de Janeiro
+RUA-038: Rua Minas Gerais
+RUA-039: Rua Bahia
+RUA-040: Rua Pernambuco
+RUA-041: Rua Paraná
+RUA-042: Rua Ceará
+RUA-043: Rua Amazonas
+RUA-044: Rua Goiás
+RUA-045: Rua Alagoas
+RUA-046: Av. dos Trabalhadores
+RUA-047: Rua da Saudade
+RUA-048: Rua da Esperança
+RUA-049: Rua da Paz
+RUA-050: Rua da Alegria
+RUA-051: Rua Carlos Gomes
+RUA-052: Rua Villa-Lobos
+RUA-053: Rua Santos Dumont
+RUA-054: Rua Oswaldo Cruz
+RUA-055: Rua José Bonifácio
+RUA-056: Av. Presidente Kennedy
+RUA-057: Rua Visconde de Mauá
+RUA-058: Rua General Osório
+RUA-059: Rua Padre Anchieta
+RUA-060: Rua Frei Caneca
+RUA-061: Rua Marquês de Itu
+RUA-062: Av. do Contorno
 
 ## Praças
-PRACA-01: Praça da Matriz
-PRACA-02: Praça da República
-PRACA-03: Praça dos Três Poderes
-PRACA-04: Praça da Bandeira
-PRACA-05: Praça da Liberdade
-PRACA-06: Praça Dom Pedro
-PRACA-07: Praça das Flores
-PRACA-08: Praça do Sol
-PRACA-09: Praça da Estação
-PRACA-10: Praça Tiradentes
-PRACA-11: Praça XV
-PRACA-12: Praça Rui Barbosa
-PRACA-13: Praça Duque de Caxias
-PRACA-14: Praça Getúlio Vargas
-PRACA-15: Praça das Palmeiras
-PRACA-16: Praça dos Ipês
-PRACA-17: Praça São José
-PRACA-18: Praça Santa Luzia
-PRACA-19: Praça Nossa Senhora
-PRACA-20: Praça do Pescador
-PRACA-21: Praça dos Imigrantes
-PRACA-22: Praça da Juventude
-PRACA-23: Praça do Trabalhador
-PRACA-24: Praça da Cultura
-PRACA-25: Praça da Música
-PRACA-26: Praça dos Esportes
-PRACA-27: Praça da Paz
-PRACA-28: Praça da Amizade
-PRACA-29: Praça Bela Vista
-PRACA-30: Praça Alto da Colina
-PRACA-31: Praça Jardim América
-PRACA-32: Praça Vila Nova
-PRACA-33: Praça São Cristóvão
-PRACA-34: Praça Santo Antônio
-PRACA-35: Praça Boa Viagem
-PRACA-36: Praça do Farol
+PRACA-001: Praça da Matriz
+PRACA-002: Praça da República
+PRACA-003: Praça dos Três Poderes
+PRACA-004: Praça da Bandeira
+PRACA-005: Praça da Liberdade
+PRACA-006: Praça Dom Pedro
+PRACA-007: Praça das Flores
+PRACA-008: Praça do Sol
+PRACA-009: Praça da Estação
+PRACA-010: Praça Tiradentes
+PRACA-011: Praça XV
+PRACA-012: Praça Rui Barbosa
+PRACA-013: Praça Duque de Caxias
+PRACA-014: Praça Getúlio Vargas
+PRACA-015: Praça das Palmeiras
+PRACA-016: Praça dos Ipês
+PRACA-017: Praça São José
+PRACA-018: Praça Santa Luzia
+PRACA-019: Praça Nossa Senhora
+PRACA-020: Praça do Pescador
+PRACA-021: Praça dos Imigrantes
+PRACA-022: Praça da Juventude
+PRACA-023: Praça do Trabalhador
+PRACA-024: Praça da Cultura
+PRACA-025: Praça da Música
+PRACA-026: Praça dos Esportes
+PRACA-027: Praça da Paz
+PRACA-028: Praça da Amizade
+PRACA-029: Praça Bela Vista
+PRACA-030: Praça Alto da Colina
+PRACA-031: Praça Jardim América
+PRACA-032: Praça Vila Nova
+PRACA-033: Praça São Cristóvão
+PRACA-034: Praça Santo Antônio
+PRACA-035: Praça Boa Viagem
+PRACA-036: Praça do Farol
 
 ## Comércios
-COM-01: Farmácia Bom Preço
-COM-02: Padaria Bom Preço
-COM-03: Mercado Bom Preço
-COM-04: Mercadinho Bom Preço
-COM-05: Empório São Jorge
-COM-06: Barbearia Bom Preço
-COM-07: Oficina Bom Preço
-COM-08: Lanchonete Bom Preço
-COM-09: Café Bom Preço
-COM-10: Livraria Bom Preço
-COM-11: Papelaria Bom Preço
-COM-12: Açougue Bom Preço
-COM-13: Quitanda Bom Preço
-COM-14: Pizzaria Bom Preço
-COM-15: Sorveteria Bom Preço
-COM-16: Restaurante Bom Preço
-COM-17: Pet Shop Bom Preço
-COM-18: Loja de Roupas Bom Preço
-COM-19: Sapataria Bom Preço
-COM-20: Relojoaria Bom Preço
-COM-21: Ótica Bom Preço
-COM-22: Floricultura Bom Preço
-COM-23: Banca de Jornal Bom Preço
-COM-24: Lavanderia Bom Preço
-COM-25: Auto Peças Bom Preço
-COM-26: Borracharia Bom Preço
-COM-27: Eletrônica Bom Preço
-COM-28: Informática Bom Preço
-COM-29: Academia Bom Preço
-COM-30: Clínica Bom Preço
-COM-31: Dentista Bom Preço
-COM-32: Veterinária Bom Preço
-COM-33: Chaveiro Bom Preço
-COM-34: Confeitaria Bom Preço
-COM-35: Pastelaria Bom Preço
-COM-36: Hamburgueria Bom Preço
-COM-37: Bistrô Bom Preço
-COM-38: Armazém Bom Preço
-COM-39: Ferragens Bom Preço
-COM-40: Material de Construção Bom Preço
-COM-41: Móveis Bom Preço
-COM-42: Tintas Bom Preço
-COM-43: Vidraçaria Bom Preço
-COM-44: Gráfica Bom Preço
-COM-45: Locadora Bom Preço
-COM-46: Estacionamento Bom Preço
-COM-47: Posto Bom Preço
-COM-48: Tabacaria Bom Preço
-COM-49: Casa Lotérica Bom Preço
-COM-50: Joalheria Bom Preço
-COM-51: Perfumaria Bom Preço
-COM-52: Farmácia Central
-COM-53: Padaria Central
-COM-54: Mercado Central
-COM-55: Mercadinho Central
-COM-56: Barbearia Central
-COM-57: Oficina Central
-COM-58: Lanchonete Central
-COM-59: Café Central
-COM-60: Livraria Central
-COM-61: Papelaria Central
-COM-62: Açougue Central
-COM-63: Quitanda Central
-COM-64: Pizzaria Central
-COM-65: Sorveteria Central
-COM-66: Restaurante Central
-COM-67: Pet Shop Central
-COM-68: Loja de Roupas Central
-COM-69: Sapataria Central
-COM-70: Relojoaria Central
-COM-71: Ótica Central
-COM-72: Floricultura Central
-COM-73: Banca de Jornal Central
-COM-74: Lavanderia Central
-COM-75: Auto Peças Central
-COM-76: Borracharia Central
-COM-77: Eletrônica Central
-COM-78: Informática Central
-COM-79: Academia Central
-COM-80: Clínica Central
-COM-81: Dentista Central
-COM-82: Veterinária Central
-COM-83: Chaveiro Central
-COM-84: Confeitaria Central
-COM-85: Pastelaria Central
-COM-86: Hamburgueria Central
-COM-87: Bistrô Central
-COM-88: Armazém Central
-COM-89: Ferragens Central
-COM-90: Material de Construção Central
-COM-91: Móveis Central
-COM-92: Tintas Central
-COM-93: Vidraçaria Central
-COM-94: Gráfica Central
-COM-95: Locadora Central
-COM-96: Estacionamento Central
-COM-97: Posto Central
-COM-98: Tabacaria Central
-COM-99: Casa Lotérica Central
+COM-001: Farmácia Bom Preço
+COM-002: Padaria Bom Preço
+COM-003: Mercado Bom Preço
+COM-004: Mercadinho Bom Preço
+COM-005: Empório São Jorge
+COM-006: Barbearia Bom Preço
+COM-007: Oficina Bom Preço
+COM-008: Lanchonete Bom Preço
+COM-009: Café Bom Preço
+COM-010: Livraria Bom Preço
+COM-011: Papelaria Bom Preço
+COM-012: Açougue Bom Preço
+COM-013: Quitanda Bom Preço
+COM-014: Pizzaria Bom Preço
+COM-015: Sorveteria Bom Preço
+COM-016: Restaurante Bom Preço
+COM-017: Pet Shop Bom Preço
+COM-018: Loja de Roupas Bom Preço
+COM-019: Sapataria Bom Preço
+COM-020: Relojoaria Bom Preço
+COM-021: Ótica Bom Preço
+COM-022: Floricultura Bom Preço
+COM-023: Banca de Jornal Bom Preço
+COM-024: Lavanderia Bom Preço
+COM-025: Auto Peças Bom Preço
+COM-026: Borracharia Bom Preço
+COM-027: Eletrônica Bom Preço
+COM-028: Informática Bom Preço
+COM-029: Academia Bom Preço
+COM-030: Clínica Bom Preço
+COM-031: Dentista Bom Preço
+COM-032: Veterinária Bom Preço
+COM-033: Chaveiro Bom Preço
+COM-034: Confeitaria Bom Preço
+COM-035: Pastelaria Bom Preço
+COM-036: Hamburgueria Bom Preço
+COM-037: Bistrô Bom Preço
+COM-038: Armazém Bom Preço
+COM-039: Ferragens Bom Preço
+COM-040: Material de Construção Bom Preço
+COM-041: Móveis Bom Preço
+COM-042: Tintas Bom Preço
+COM-043: Vidraçaria Bom Preço
+COM-044: Gráfica Bom Preço
+COM-045: Locadora Bom Preço
+COM-046: Estacionamento Bom Preço
+COM-047: Posto Bom Preço
+COM-048: Tabacaria Bom Preço
+COM-049: Casa Lotérica Bom Preço
+COM-050: Joalheria Bom Preço
+COM-051: Perfumaria Bom Preço
+COM-052: Farmácia Central
+COM-053: Padaria Central
+COM-054: Mercado Central
+COM-055: Mercadinho Central
+COM-056: Barbearia Central
+COM-057: Oficina Central
+COM-058: Lanchonete Central
+COM-059: Café Central
+COM-060: Livraria Central
+COM-061: Papelaria Central
+COM-062: Açougue Central
+COM-063: Quitanda Central
+COM-064: Pizzaria Central
+COM-065: Sorveteria Central
+COM-066: Restaurante Central
+COM-067: Pet Shop Central
+COM-068: Loja de Roupas Central
+COM-069: Sapataria Central
+COM-070: Relojoaria Central
+COM-071: Ótica Central
+COM-072: Floricultura Central
+COM-073: Banca de Jornal Central
+COM-074: Lavanderia Central
+COM-075: Auto Peças Central
+COM-076: Borracharia Central
+COM-077: Eletrônica Central
+COM-078: Informática Central
+COM-079: Academia Central
+COM-080: Clínica Central
+COM-081: Dentista Central
+COM-082: Veterinária Central
+COM-083: Chaveiro Central
+COM-084: Confeitaria Central
+COM-085: Pastelaria Central
+COM-086: Hamburgueria Central
+COM-087: Bistrô Central
+COM-088: Armazém Central
+COM-089: Ferragens Central
+COM-090: Material de Construção Central
+COM-091: Móveis Central
+COM-092: Tintas Central
+COM-093: Vidraçaria Central
+COM-094: Gráfica Central
+COM-095: Locadora Central
+COM-096: Estacionamento Central
+COM-097: Posto Central
+COM-098: Tabacaria Central
+COM-099: Casa Lotérica Central
 COM-100: Joalheria Central
 COM-101: Perfumaria Central
 COM-102: Farmácia Estrela
@@ -857,105 +857,105 @@ COM-750: Joalheria Vitória
 COM-751: Perfumaria Vitória
 
 ## Casas
-CASA-01: Casa da Família Silva
-CASA-02: Casa do Mauro
-CASA-03: Casa do Mauro Santos
-CASA-04: Casa do Silva Santos
-CASA-05: Casa do Oliveira Santos
-CASA-06: Casa do Santos Santos
-CASA-07: Casa do Souza Santos
-CASA-08: Casa do Pereira Santos
-CASA-09: Casa do Costa Santos
-CASA-10: Casa do Rodrigues Santos
-CASA-11: Casa do Almeida Santos
-CASA-12: Casa do Nascimento Santos
-CASA-13: Casa do Lima Santos
-CASA-14: Casa do Araújo Santos
-CASA-15: Casa do Fernandes Santos
-CASA-16: Casa do Carvalho Santos
-CASA-17: Casa do Gomes Santos
-CASA-18: Casa do Martins Santos
-CASA-19: Casa do Rocha Santos
-CASA-20: Casa do Ribeiro Santos
-CASA-21: Casa do Alves Santos
-CASA-22: Casa do Monteiro Santos
-CASA-23: Casa do Mendes Santos
-CASA-24: Casa do Barros Santos
-CASA-25: Casa do Freitas Santos
-CASA-26: Casa do Barbosa Santos
-CASA-27: Casa do Pinto Santos
-CASA-28: Casa do Moura Santos
-CASA-29: Casa do Cavalcanti Santos
-CASA-30: Casa do Dias Santos
-CASA-31: Casa do Castro Santos
-CASA-32: Casa do Campos Santos
-CASA-33: Casa do Cardoso Santos
-CASA-34: Casa do Teixeira Santos
-CASA-35: Casa do Correia Santos
-CASA-36: Casa do Nunes Santos
-CASA-37: Casa do Vieira Santos
-CASA-38: Casa do Moreira Santos
-CASA-39: Casa do Ferreira Santos
-CASA-40: Casa do Duarte Santos
-CASA-41: Casa do Fonseca Santos
-CASA-42: Casa do Machado Santos
-CASA-43: Casa do Azevedo Santos
-CASA-44: Casa do Cunha Santos
-CASA-45: Casa do Lopes Santos
-CASA-46: Casa do Soares Santos
-CASA-47: Casa do Ramos Santos
-CASA-48: Casa do Reis Santos
-CASA-49: Casa do Borges Santos
-CASA-50: Casa do Cruz Santos
-CASA-51: Casa do Tavares Santos
-CASA-52: Casa do Peixoto Santos
-CASA-53: Casa do Ana Santos
-CASA-54: Casa do Beatriz Santos
-CASA-55: Casa do Carlos Santos
-CASA-56: Casa do Daniel Santos
-CASA-57: Casa do Eduardo Santos
-CASA-58: Casa do Fernanda Santos
-CASA-59: Casa do Gabriel Santos
-CASA-60: Casa do Helena Santos
-CASA-61: Casa do Igor Santos
-CASA-62: Casa do Juliana Santos
-CASA-63: Sede da Hostnet
-CASA-64: Casa do Mariana Santos
-CASA-65: Casa do Nícolas Santos
-CASA-66: Casa do Patrícia Santos
-CASA-67: Casa do Rafael Santos
-CASA-68: Casa do Camila Santos
-CASA-69: Casa do Thiago Santos
-CASA-70: Casa do Vanessa Santos
-CASA-71: Casa do Bruno Santos
-CASA-72: Casa do Larissa Santos
-CASA-73: Casa do Mauro Lima
-CASA-74: Casa do Silva Lima
-CASA-75: Casa do Oliveira Lima
-CASA-76: Casa do Santos Lima
-CASA-77: Casa do Souza Lima
-CASA-78: Casa do Pereira Lima
-CASA-79: Casa do Costa Lima
-CASA-80: Casa do Rodrigues Lima
-CASA-81: Casa do Almeida Lima
-CASA-82: Casa do Nascimento Lima
-CASA-83: Casa do Lima Lima
-CASA-84: Casa do Araújo Lima
-CASA-85: Casa do Fernandes Lima
-CASA-86: Casa do Carvalho Lima
-CASA-87: Casa do Gomes Lima
-CASA-88: Casa do Martins Lima
-CASA-89: Casa do Rocha Lima
-CASA-90: Casa do Ribeiro Lima
-CASA-91: Casa do Alves Lima
-CASA-92: Casa do Monteiro Lima
-CASA-93: Casa do Mendes Lima
-CASA-94: Casa do Barros Lima
-CASA-95: Casa do Freitas Lima
-CASA-96: Casa do Barbosa Lima
-CASA-97: Casa do Pinto Lima
-CASA-98: Casa do Moura Lima
-CASA-99: Casa do Cavalcanti Lima
+CASA-001: Casa da Família Silva
+CASA-002: Casa do Mauro
+CASA-003: Casa do Mauro Santos
+CASA-004: Casa do Silva Santos
+CASA-005: Casa do Oliveira Santos
+CASA-006: Casa do Santos Santos
+CASA-007: Casa do Souza Santos
+CASA-008: Casa do Pereira Santos
+CASA-009: Casa do Costa Santos
+CASA-010: Casa do Rodrigues Santos
+CASA-011: Casa do Almeida Santos
+CASA-012: Casa do Nascimento Santos
+CASA-013: Casa do Lima Santos
+CASA-014: Casa do Araújo Santos
+CASA-015: Casa do Fernandes Santos
+CASA-016: Casa do Carvalho Santos
+CASA-017: Casa do Gomes Santos
+CASA-018: Casa do Martins Santos
+CASA-019: Casa do Rocha Santos
+CASA-020: Casa do Ribeiro Santos
+CASA-021: Casa do Alves Santos
+CASA-022: Casa do Monteiro Santos
+CASA-023: Casa do Mendes Santos
+CASA-024: Casa do Barros Santos
+CASA-025: Casa do Freitas Santos
+CASA-026: Casa do Barbosa Santos
+CASA-027: Casa do Pinto Santos
+CASA-028: Casa do Moura Santos
+CASA-029: Casa do Cavalcanti Santos
+CASA-030: Casa do Dias Santos
+CASA-031: Casa do Castro Santos
+CASA-032: Casa do Campos Santos
+CASA-033: Casa do Cardoso Santos
+CASA-034: Casa do Teixeira Santos
+CASA-035: Casa do Correia Santos
+CASA-036: Casa do Nunes Santos
+CASA-037: Casa do Vieira Santos
+CASA-038: Casa do Moreira Santos
+CASA-039: Casa do Ferreira Santos
+CASA-040: Casa do Duarte Santos
+CASA-041: Casa do Fonseca Santos
+CASA-042: Casa do Machado Santos
+CASA-043: Casa do Azevedo Santos
+CASA-044: Casa do Cunha Santos
+CASA-045: Casa do Lopes Santos
+CASA-046: Casa do Soares Santos
+CASA-047: Casa do Ramos Santos
+CASA-048: Casa do Reis Santos
+CASA-049: Casa do Borges Santos
+CASA-050: Casa do Cruz Santos
+CASA-051: Casa do Tavares Santos
+CASA-052: Casa do Peixoto Santos
+CASA-053: Casa do Ana Santos
+CASA-054: Casa do Beatriz Santos
+CASA-055: Casa do Carlos Santos
+CASA-056: Casa do Daniel Santos
+CASA-057: Casa do Eduardo Santos
+CASA-058: Casa do Fernanda Santos
+CASA-059: Casa do Gabriel Santos
+CASA-060: Casa do Helena Santos
+CASA-061: Casa do Igor Santos
+CASA-062: Casa do Juliana Santos
+CASA-063: Sede da Hostnet
+CASA-064: Casa do Mariana Santos
+CASA-065: Casa do Nícolas Santos
+CASA-066: Casa do Patrícia Santos
+CASA-067: Casa do Rafael Santos
+CASA-068: Casa do Camila Santos
+CASA-069: Casa do Thiago Santos
+CASA-070: Casa do Vanessa Santos
+CASA-071: Casa do Bruno Santos
+CASA-072: Casa do Larissa Santos
+CASA-073: Casa do Mauro Lima
+CASA-074: Casa do Silva Lima
+CASA-075: Casa do Oliveira Lima
+CASA-076: Casa do Santos Lima
+CASA-077: Casa do Souza Lima
+CASA-078: Casa do Pereira Lima
+CASA-079: Casa do Costa Lima
+CASA-080: Casa do Rodrigues Lima
+CASA-081: Casa do Almeida Lima
+CASA-082: Casa do Nascimento Lima
+CASA-083: Casa do Lima Lima
+CASA-084: Casa do Araújo Lima
+CASA-085: Casa do Fernandes Lima
+CASA-086: Casa do Carvalho Lima
+CASA-087: Casa do Gomes Lima
+CASA-088: Casa do Martins Lima
+CASA-089: Casa do Rocha Lima
+CASA-090: Casa do Ribeiro Lima
+CASA-091: Casa do Alves Lima
+CASA-092: Casa do Monteiro Lima
+CASA-093: Casa do Mendes Lima
+CASA-094: Casa do Barros Lima
+CASA-095: Casa do Freitas Lima
+CASA-096: Casa do Barbosa Lima
+CASA-097: Casa do Pinto Lima
+CASA-098: Casa do Moura Lima
+CASA-099: Casa do Cavalcanti Lima
 CASA-100: Casa do Dias Lima
 CASA-101: Casa do Castro Lima
 CASA-102: Casa do Campos Lima
@@ -1729,43 +1729,43 @@ CASA-869: Vila Cavalcanti Ribeiro
 CASA-870: Vila Dias Ribeiro
 CASA-871: Vila Castro Ribeiro
 CASA-872: Vila Campos Ribeiro
-HOSP-01: Hospital Noroeste
-HOSP-02: Hospital Norte
-HOSP-03: Hospital Nordeste
-HOSP-04: Hospital Oeste
-HOSP-05: Hospital Central
-HOSP-06: Hospital Leste
-HOSP-07: Hospital Sudoeste
-HOSP-08: Hospital Sul
-HOSP-09: Hospital Sudeste
-HOSP-10: Hospital Aurora
-HOSP-11: Hospital Esperança
-HOSP-12: Hospital Santa Clara
-HOSP-13: Hospital São Lucas
-HOSP-14: Hospital Vitória
-HOSP-15: Hospital Horizonte
-HOSP-16: Hospital Liberdade
-HOSP-17: Hospital Atlântico
-HOSP-18: Hospital Paulista
-HOSP-19: Hospital Guanabara
-HOSP-20: Hospital Boa Vista
-HOSP-21: Hospital Primavera
-HOSP-22: Hospital Bela Vista
-HOSP-23: Hospital Alvorada
-HOSP-24: Hospital Progresso
-HOSP-25: Hospital Independência
-HOSP-26: Hospital Bandeirantes
-HOSP-27: Hospital Planalto
-HOSP-28: Hospital Serra Verde
-HOSP-29: Hospital Parque Novo
-HOSP-30: Hospital Jardins
-HOSP-31: Hospital Centro-Sul
-HOSP-32: Hospital Vila Nova
-HOSP-33: Hospital Porto Seguro
-HOSP-34: Hospital Monte Verde
-HOSP-35: Hospital Santa Cruz
-HOSP-36: Hospital São José
-HOSP-37: Hospital São Gabriel
-HOSP-38: Hospital São Vicente
-HOSP-39: Hospital Santa Maria
-HOSP-40: Hospital Metropolitano
+HOSP-001: Hospital Noroeste
+HOSP-002: Hospital Norte
+HOSP-003: Hospital Nordeste
+HOSP-004: Hospital Oeste
+HOSP-005: Hospital Central
+HOSP-006: Hospital Leste
+HOSP-007: Hospital Sudoeste
+HOSP-008: Hospital Sul
+HOSP-009: Hospital Sudeste
+HOSP-010: Hospital Aurora
+HOSP-011: Hospital Esperança
+HOSP-012: Hospital Santa Clara
+HOSP-013: Hospital São Lucas
+HOSP-014: Hospital Vitória
+HOSP-015: Hospital Horizonte
+HOSP-016: Hospital Liberdade
+HOSP-017: Hospital Atlântico
+HOSP-018: Hospital Paulista
+HOSP-019: Hospital Guanabara
+HOSP-020: Hospital Boa Vista
+HOSP-021: Hospital Primavera
+HOSP-022: Hospital Bela Vista
+HOSP-023: Hospital Alvorada
+HOSP-024: Hospital Progresso
+HOSP-025: Hospital Independência
+HOSP-026: Hospital Bandeirantes
+HOSP-027: Hospital Planalto
+HOSP-028: Hospital Serra Verde
+HOSP-029: Hospital Parque Novo
+HOSP-030: Hospital Jardins
+HOSP-031: Hospital Centro-Sul
+HOSP-032: Hospital Vila Nova
+HOSP-033: Hospital Porto Seguro
+HOSP-034: Hospital Monte Verde
+HOSP-035: Hospital Santa Cruz
+HOSP-036: Hospital São José
+HOSP-037: Hospital São Gabriel
+HOSP-038: Hospital São Vicente
+HOSP-039: Hospital Santa Maria
+HOSP-040: Hospital Metropolitano

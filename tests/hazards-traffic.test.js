@@ -66,7 +66,7 @@ test('todos os veículos iniciam com motorista NPC, sem carros parados vazios, e
 
 test('jogador ejetado arrasta na direção do movimento e sofre dano extra ao bater em obstáculo', () => {
   const map = new CityMap();
-  const casa = map.resolveLocationCode('CASA-01');
+  const casa = map.resolveLocationCode('CASA-001');
   const wall = casa.interior.walls[0];
 
   const player = {
@@ -153,7 +153,7 @@ test('veículos e lixeiras causam dano em pedestres na rua', () => {
 test('pedestres dão um passo para trás e desviam ao colidir com jogador ou outros pedestres', () => {
   const map = new CityMap();
   const traffic = new TrafficManager(map);
-  const road = map.resolveLocationCode('RUA-01');
+  const road = map.resolveLocationCode('RUA-001');
   const pedA = traffic.pedestrians[0];
   const pedB = traffic.pedestrians[1];
 
@@ -190,7 +190,7 @@ test('pedestres dão um passo para trás e desviam ao colidir com jogador ou out
 test('pedestres colidem com veículos estacionados e não colidem com lixeiras paradas ao caminhar', () => {
   const map = new CityMap();
   const traffic = new TrafficManager(map);
-  const road = map.resolveLocationCode('RUA-01');
+  const road = map.resolveLocationCode('RUA-001');
   const ped = traffic.pedestrians[0];
   const player = { x: road.bounds.x + 100, y: road.bounds.y + 100, inVehicleId: null, isDead: false, radius: 11 };
 

@@ -608,11 +608,11 @@ class MissionsAndEncountersTab(QWidget):
         m = Mission(
             id=mid,
             title='Nova Missão',
-            start='CASA-01',
-            target='PRACA-01',
-            objective='Vá até PRACA-01.',
-            cutscene_inicio=CutsceneBlock(name='CUTSCENE_INICIO', left=c1, right=c2, bg='Frente da CASA-01'),
-            cutscene_fim=CutsceneBlock(name='CUTSCENE_FIM', left=c1, right=c2, bg='PRACA-01'),
+            start='CASA-001',
+            target='PRACA-001',
+            objective='Vá até PRACA-001.',
+            cutscene_inicio=CutsceneBlock(name='CUTSCENE_INICIO', left=c1, right=c2, bg='Frente da CASA-001'),
+            cutscene_fim=CutsceneBlock(name='CUTSCENE_FIM', left=c1, right=c2, bg='PRACA-001'),
         )
         self._pkg.missions[mid] = m
         self._pkg.missions_order.append(mid)
@@ -696,9 +696,9 @@ class MissionsAndEncountersTab(QWidget):
         enc = Encounter(
             id=eid,
             npc=npc,
-            location='CASA-01',
-            prompt='Conversar na CASA-01',
-            cutscene=CutsceneBlock(name='CUTSCENE', left=npc or 'none', right=npc or 'none', bg='Interior da CASA-01'),
+            location='CASA-001',
+            prompt='Conversar na CASA-001',
+            cutscene=CutsceneBlock(name='CUTSCENE', left=npc or 'none', right=npc or 'none', bg='Interior da CASA-001'),
         )
         self._pkg.encounters[eid] = enc
         self._pkg.encounters_order.append(eid)

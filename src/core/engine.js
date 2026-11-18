@@ -594,7 +594,7 @@ export class Engine {
     });
   }
 
-  resetMatch(startCode = 'CASA-01', targetCode = null) {
+  resetMatch(startCode = 'CASA-001', targetCode = null) {
     this.vehicles = [];
     this.trashBins = [];
     this.activeChunkKeys = new Set();

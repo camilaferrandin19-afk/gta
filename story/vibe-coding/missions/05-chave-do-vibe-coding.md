@@ -2,8 +2,8 @@
 id: 05-chave-do-vibe-coding
 title: Missão 5 — A Chave do Vibe Coding
 start: CASA-656
-pickup: PRACA-29
-pickup_objective: Pegue a Chave Mestra em [PRACA-29]
+pickup: PRACA-029
+pickup_objective: Pegue a Chave Mestra em [PRACA-029]
 target: CASA-353
 objective: Leve a Chave Mestra até Lucia em [CASA-353]
 give_item: chave-secreta
@@ -18,7 +18,7 @@ right: lucia
 bg: Sudeste da cidade em CASA-656
 
 - Lucia: Guanabara, o Jason e eu já preparamos toda a bancada aqui em [CASA-353]! Só falta a Chave Mestra que o Sam Maltmon mencionou!
-- Guanabara: Tô saindo do Sudeste agora mesmo! A [PRACA-29] fica logo ali na esquina.
+- Guanabara: Tô saindo do Sudeste agora mesmo! A [PRACA-029] fica logo ali na esquina.
 - Lucia: Pega a chave e vem pro Centro! Toda a equipe está curiosa para saber o que tem dentro da Caixa Secreta!
 
 ## CUTSCENE_FIM

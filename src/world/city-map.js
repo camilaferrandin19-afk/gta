@@ -279,7 +279,7 @@ export class CityMap {
 
   #placeHospitals() {
     const protectedCodes = new Set([
-      'CASA-01', 'CASA-02', 'COM-01', 'COM-24',
+      'CASA-001', 'CASA-002', 'COM-001', 'COM-024',
       'COM-320', 'CASA-353', 'COM-554', 'CASA-656'
     ]);
     const offsets = [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1]];

@@ -64,7 +64,7 @@ test('carrega e valida o pacote de história de exemplo completo contra a cidade
     'missions/01-caixa-secreta.md',
     cityMap
   );
-  assert.equal(m1.startLocation, 'CASA-01');
+  assert.equal(m1.startLocation, 'CASA-001');
   assert.equal(m1.targetLocation, 'COM-320');
   assert.ok(m1.introCutscene.steps.length >= 2);
   const choiceStep = m1.introCutscene.steps.find((s) => s.choices?.length);
@@ -113,7 +113,7 @@ test('sinaliza erro descritivo para frontmatter inválido ou código de local in
   const badMission = `---
 id: m-err
 title: Missão Inválida
-start: CASA-01
+start: CASA-001
 target: NAO-EXISTE-99
 ---
 `;
@@ -164,19 +164,19 @@ test('map/map.md mapeia todos os locais da cidade e substitui códigos em falas 
   const mapRaw = fs.readFileSync(path.join(storyDir, 'map/map.md'), 'utf8');
   const locationNames = parseMapMarkdown(mapRaw, 'map/map.md');
 
-  assert.equal(locationNames.get('COM-01'), 'Farmácia Bom Preço');
-  assert.equal(locationNames.get('RUA-01'), 'Av. Aurélio Valporto');
-  assert.equal(locationNames.get('CASA-02'), 'Casa do Mauro');
+  assert.equal(locationNames.get('COM-001'), 'Farmácia Bom Preço');
+  assert.equal(locationNames.get('RUA-001'), 'Av. Aurélio Valporto');
+  assert.equal(locationNames.get('CASA-002'), 'Casa do Mauro');
 
   for (const code of cityMap.locationsByCode.keys()) {
     assert.ok(locationNames.has(code), `Código ausente em map/map.md: ${code}`);
     assert.ok(locationNames.get(code).length > 0);
   }
 
-  const speech = 'leve essa encomenda para a [CASA-02] na [RUA-02] e ignore CASA-02 sem colchetes';
+  const speech = 'leve essa encomenda para a [CASA-002] na [RUA-002] e ignore CASA-002 sem colchetes';
   assert.equal(
     replaceLocationCodesWithNames(speech, locationNames),
-    'leve essa encomenda para a **__Casa do Mauro__** na **__Rua dos Guararapes__** e ignore CASA-02 sem colchetes'
+    'leve essa encomenda para a **__Casa do Mauro__** na **__Rua dos Guararapes__** e ignore CASA-002 sem colchetes'
   );
 });
 
@@ -187,12 +187,12 @@ test('resolve cenários PNG/JPG de cutscene por código ou tipo (RUA, PRACA, COM
     assert.equal(hasExample, true, `Ausente: story/map/${prefix}(-1).png ou .jpg`);
   }
 
-  const candidates = getCutsceneBackgroundCandidates('./story', 'Frente da CASA-01', 'CASA-01');
+  const candidates = getCutsceneBackgroundCandidates('./story', 'Frente da CASA-001', 'CASA-001');
   assert.deepEqual(candidates, [
-    './story/map/CASA-01.png',
-    './story/map/CASA-01.jpg',
-    './story/map/casa-01.png',
-    './story/map/casa-01.jpg',
+    './story/map/CASA-001.png',
+    './story/map/CASA-001.jpg',
+    './story/map/casa-001.png',
+    './story/map/casa-001.jpg',
     './story/map/casa.png',
     './story/map/casa.jpg',
   ]);
@@ -436,8 +436,8 @@ test('parseMissionMarkdown interpreta diretiva - LINK: com rótulo personalizado
   const md = `---
 id: m-link
 title: Teste Link
-start: RUA-01-01
-target: COM-01-01
+start: RUA-001-01
+target: COM-001-01
 ---
 ## CUTSCENE_INICIO
 left: prota
@@ -464,8 +464,8 @@ test('parseMissionMarkdown rejeita - LINK: inválido, protocolo proibido ou sem 
   const baseHeader = `---
 id: m-link-err
 title: Erro Link
-start: RUA-01-01
-target: COM-01-01
+start: RUA-001-01
+target: COM-001-01
 ---
 ## CUTSCENE_INICIO
 left: prota
@@ -508,12 +508,12 @@ test('parseEncounterMarkdown lê encontro extra em construção e rejeita local 
 
   assert.equal(encounter.id, 'extra-casa-hostnet');
   assert.ok(encounter.npc);
-  assert.equal(encounter.location, 'CASA-63');
+  assert.equal(encounter.location, 'CASA-063');
   assert.match(encounter.roofColor, /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/);
   assert.ok(encounter.cutscene.steps.length >= 2);
 
   const defaultEncounter = parseEncounterMarkdown(
-    `---\nid: def\nnpc: maltmon\nlocation: CASA-63\n---\n## CUTSCENE\n- maltmon: Oi\n`,
+    `---\nid: def\nnpc: maltmon\nlocation: CASA-063\n---\n## CUTSCENE\n- maltmon: Oi\n`,
     'def.md',
     map,
   );
@@ -521,7 +521,7 @@ test('parseEncounterMarkdown lê encontro extra em construção e rejeita local 
   assert.equal(defaultEncounter.roofLogo, '');
 
   const customEncounter = parseEncounterMarkdown(
-    `---\nid: custom\nnpc: maltmon\nlocation: CASA-63\nroof_color: #2563eb\nroof_logo: assets/alex-front.svg\n---\n## CUTSCENE\n- maltmon: Oi\n`,
+    `---\nid: custom\nnpc: maltmon\nlocation: CASA-063\nroof_color: #2563eb\nroof_logo: assets/alex-front.svg\n---\n## CUTSCENE\n- maltmon: Oi\n`,
     'custom.md',
     map,
   );
@@ -531,7 +531,7 @@ test('parseEncounterMarkdown lê encontro extra em construção e rejeita local 
   assert.throws(
     () =>
       parseEncounterMarkdown(
-        `---\nid: badcolor\nnpc: maltmon\nlocation: CASA-63\nroof_color: azul\n---\n## CUTSCENE\n- maltmon: Oi\n`,
+        `---\nid: badcolor\nnpc: maltmon\nlocation: CASA-063\nroof_color: azul\n---\n## CUTSCENE\n- maltmon: Oi\n`,
         'badcolor.md',
         map,
       ),
@@ -541,7 +541,7 @@ test('parseEncounterMarkdown lê encontro extra em construção e rejeita local 
   assert.throws(
     () =>
       parseEncounterMarkdown(
-        `---\nid: bad\nnpc: maltmon\nlocation: RUA-04\n---\n## CUTSCENE\n- maltmon: Oi\n`,
+        `---\nid: bad\nnpc: maltmon\nlocation: RUA-004\n---\n## CUTSCENE\n- maltmon: Oi\n`,
         'bad.md',
         map,
       ),
@@ -578,27 +578,27 @@ test('parseStoryCatalog valida stories.json real, entrada direta para 1 históri
 
 test('parseMapMarkdown e parseMapRoofsMarkdown leem roof_color e roof_logo opcionais por edificação', () => {
   const sample = [
-    'RUA-01: Av. Central',
-    'CASA-10: Casa Azul | roof_color=#2563eb | roof_logo=assets/hostnet.svg',
-    'COM-02: Loja Verde | roof_color=#16a34a',
+    'RUA-001: Av. Central',
+    'CASA-010: Casa Azul | roof_color=#2563eb | roof_logo=assets/hostnet.svg',
+    'COM-002: Loja Verde | roof_color=#16a34a',
   ].join('\n');
 
   const names = parseMapMarkdown(sample, 'map/map.md');
-  assert.equal(names.get('RUA-01'), 'Av. Central');
-  assert.equal(names.get('CASA-10'), 'Casa Azul');
-  assert.equal(names.get('COM-02'), 'Loja Verde');
+  assert.equal(names.get('RUA-001'), 'Av. Central');
+  assert.equal(names.get('CASA-010'), 'Casa Azul');
+  assert.equal(names.get('COM-002'), 'Loja Verde');
 
   const roofs = parseMapRoofsMarkdown(sample, 'map/map.md');
-  assert.deepEqual(roofs.get('CASA-10'), { roofColor: '#2563eb', roofLogo: 'assets/hostnet.svg' });
-  assert.deepEqual(roofs.get('COM-02'), { roofColor: '#16a34a', roofLogo: '' });
-  assert.equal(roofs.has('RUA-01'), false);
+  assert.deepEqual(roofs.get('CASA-010'), { roofColor: '#2563eb', roofLogo: 'assets/hostnet.svg' });
+  assert.deepEqual(roofs.get('COM-002'), { roofColor: '#16a34a', roofLogo: '' });
+  assert.equal(roofs.has('RUA-001'), false);
 
   assert.throws(
-    () => parseMapRoofsMarkdown('RUA-01: Av. Central | roof_color=#2563eb', 'map/map.md'),
+    () => parseMapRoofsMarkdown('RUA-001: Av. Central | roof_color=#2563eb', 'map/map.md'),
     StoryParseError,
   );
   assert.throws(
-    () => parseMapRoofsMarkdown('CASA-10: Casa | roof_color=azul', 'map/map.md'),
+    () => parseMapRoofsMarkdown('CASA-010: Casa | roof_color=azul', 'map/map.md'),
     StoryParseError,
   );
 });
@@ -612,12 +612,12 @@ test('parseCharacterMarkdown lê sprite_cutscene opcional para retratos PNG em a
 });
 
 test('replaceStoryPlaceholders substitui locais, itens e personagens entre colchetes com negrito/sublinhado e parseRichTextTokens interpreta estilos', () => {
-  const locationNames = new Map([['CASA-01', 'Casa Inicial'], ['RUA-02', 'Rua dos Guararapes']]);
+  const locationNames = new Map([['CASA-001', 'Casa Inicial'], ['RUA-002', 'Rua dos Guararapes']]);
   const items = new Map([['machado', { id: 'machado', name: 'Machado Dourado' }]]);
   const characters = new Map([['guanabara', { id: 'guanabara', name: 'Guanabara' }]]);
 
   const resolved = replaceStoryPlaceholders(
-    'Vá até a [CASA-01] na [RUA-02], pegue o [ITEM-MACHADO] e entregue para [Guanabara].',
+    'Vá até a [CASA-001] na [RUA-002], pegue o [ITEM-MACHADO] e entregue para [Guanabara].',
     { locationNames, items, characters },
   );
   assert.equal(

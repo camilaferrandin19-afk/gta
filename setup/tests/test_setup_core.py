@@ -46,7 +46,7 @@ class SetupCoreTests(unittest.TestCase):
         self.assertGreaterEqual(len(pkg.characters), 6)
         self.assertGreaterEqual(len(pkg.missions), 5)
         self.assertIn('extra-casa-hostnet', pkg.encounters)
-        self.assertIn('CASA-63', pkg.locations)
+        self.assertIn('CASA-063', pkg.locations)
 
         errors = validate_story(pkg, self.app_copy)
         self.assertEqual(errors, [])
@@ -80,17 +80,17 @@ class SetupCoreTests(unittest.TestCase):
         # Quebra proposital: código de local inexistente, cor inválida em rua e marcador [ITEM-...] inválido
         pkg.missions['01-caixa-secreta'].target = 'CASA-9999'
         pkg.missions['01-caixa-secreta'].objective = 'Pegue [ITEM-inexistente] em [CASA-9999]'
-        pkg.locations['RUA-01'].roof_color = '#123456'
+        pkg.locations['RUA-001'].roof_color = '#123456'
         errors = validate_story(pkg, self.app_copy)
         self.assertTrue(any('CASA-9999' in err for err in errors))
         self.assertTrue(any('ITEM-inexistente' in err for err in errors))
-        self.assertTrue(any('RUA-01' in err for err in errors))
+        self.assertTrue(any('RUA-001' in err for err in errors))
 
     def test_map_roof_roundtrip_and_asset_import_validation(self) -> None:
         locs = {
-            'RUA-01': MapLocation(code='RUA-01', name='Av. Central', kind='RUA'),
-            'CASA-10': MapLocation(
-                code='CASA-10',
+            'RUA-001': MapLocation(code='RUA-001', name='Av. Central', kind='RUA'),
+            'CASA-010': MapLocation(
+                code='CASA-010',
                 name='Casa Azul',
                 kind='CASA',
                 roof_color='#2563eb',
@@ -99,9 +99,9 @@ class SetupCoreTests(unittest.TestCase):
         }
         serialized = serialize_map_markdown(locs)
         parsed = parse_map_markdown(serialized)
-        self.assertEqual(parsed['CASA-10'].roof_color, '#2563eb')
-        self.assertEqual(parsed['CASA-10'].roof_logo, 'assets/alex-front.svg')
-        self.assertEqual(parsed['RUA-01'].name, 'Av. Central')
+        self.assertEqual(parsed['CASA-010'].roof_color, '#2563eb')
+        self.assertEqual(parsed['CASA-010'].roof_logo, 'assets/alex-front.svg')
+        self.assertEqual(parsed['RUA-001'].name, 'Av. Central')
 
         bad_file = self.tmp_dir / 'script.exe'
         bad_file.write_text('x', encoding='utf-8')

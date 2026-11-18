@@ -22,7 +22,7 @@ const ROOF_PALETTES = {
 };
 
 export function formatCode(prefix, number) {
-  return `${prefix}-${String(number).padStart(2, '0')}`;
+  return `${prefix}-${String(number).padStart(3, '0')}`;
 }
 
 export function hashBlock(bx, by) {
