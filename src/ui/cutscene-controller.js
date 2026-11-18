@@ -164,7 +164,7 @@ export class CutsceneController {
     }
     slotEl.classList.remove('hidden');
     nameEl.textContent = charDef.name;
-    const src = charDef.sprites?.[facingView] || charDef.sprites?.front || '';
+    const src = charDef.sprites?.cutscene || charDef.sprites?.[facingView] || charDef.sprites?.front || '';
     if (src) {
       imgEl.src = src;
       imgEl.alt = charDef.name;

@@ -53,11 +53,14 @@ export function getCharacterSidePngCandidates(basePath, charId, view) {
     `${cleanBase}/characters/${charId}/${charId}-${view}.png`,
     `${cleanBase}/characters/${charId}.png`,
     `${cleanBase}/characters/${charId}/${charId}.png`,
+    `${cleanBase}/assets/${charId}-${view}.png`,
+    `${cleanBase}/assets/${charId}.png`,
   ];
   if (view === 'left') {
     candidates.push(
       `${cleanBase}/characters/${charId}-right.png`,
       `${cleanBase}/characters/${charId}/${charId}-right.png`,
+      `${cleanBase}/assets/${charId}-right.png`,
     );
   }
   return candidates;

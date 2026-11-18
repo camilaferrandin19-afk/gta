@@ -600,3 +600,11 @@ test('parseMapMarkdown e parseMapRoofsMarkdown leem roof_color e roof_logo opcio
     StoryParseError,
   );
 });
+
+test('parseCharacterMarkdown lê sprite_cutscene opcional para retratos PNG em assets/', () => {
+  const customChar = parseCharacterMarkdown(
+    '---\nid: test\nname: Teste\nsprite_top: assets/t.svg\nsprite_cutscene: assets/test.png\n---\n',
+    'test.md',
+  );
+  assert.equal(customChar.sprites.cutscene, 'assets/test.png');
+});

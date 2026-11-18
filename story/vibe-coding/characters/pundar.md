@@ -7,4 +7,5 @@ sprite_top: assets/pundar-right.svg
 sprite_front: assets/pundar-right.svg
 sprite_left: assets/pundar-right.svg
 sprite_right: assets/pundar-right.svg
+sprite_cutscene: assets/pundar.png
 ---

@@ -152,6 +152,7 @@ export function parseCharacterMarkdown(rawText, fileName = 'character.md') {
       front: validateAssetPath(meta.sprite_front || '', fileName, 2),
       left: validateAssetPath(meta.sprite_left || '', fileName, 2),
       right: validateAssetPath(meta.sprite_right || '', fileName, 2),
+      cutscene: validateAssetPath(meta.sprite_cutscene || meta.cutscene_image || '', fileName, 2),
     },
   };
 }
