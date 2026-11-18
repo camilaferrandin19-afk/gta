@@ -332,10 +332,16 @@ class CityMapCanvas(QWidget):
     def fit_all(self) -> None:
         self._auto_fit = True
         if not self.scene.sceneRect().isEmpty():
+            # Calcula a escala mínima para caber o mapa inteiro na janela
             self.view.fitInView(self.scene.sceneRect(), Qt.AspectRatioMode.KeepAspectRatio)
             self._min_scale = max(1e-6, self.view.transform().m11())
+            # Amplia inicialmente pela maior dimensão e ancora no canto superior esquerdo
+            self.view.fitInView(self.scene.sceneRect(), Qt.AspectRatioMode.KeepAspectRatioByExpanding)
             if self._selected_code:
                 self.focus_code(self._selected_code)
+            else:
+                self.view.horizontalScrollBar().setValue(self.view.horizontalScrollBar().minimum())
+                self.view.verticalScrollBar().setValue(self.view.verticalScrollBar().minimum())
 
     def focus_code(self, code: str) -> None:
         raw = (code or '').strip()
