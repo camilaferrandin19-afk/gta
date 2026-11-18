@@ -26,6 +26,7 @@ class Character:
     sprite_left: str = ''
     sprite_right: str = ''
     sprite_cutscene: str = ''
+    skin_color: str = '#f1c27d'
 
 
 @dataclass

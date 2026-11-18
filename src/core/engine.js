@@ -3,7 +3,7 @@ import { RoadPathfinder } from '../world/pathfinding.js';
 import { TrafficManager } from '../world/traffic-manager.js?v=24';
 import { BoatManager } from '../world/boat-manager.js?v=17';
 import { InputManager } from '../input/input-manager.js?v=20';
-import { WebGLRenderer } from '../render/webgl-renderer.js?v=31';
+import { WebGLRenderer } from '../render/webgl-renderer.js?v=32';
 import { isInWater, resolveCircleStaticObstacle, resolveEntityCollisions, resolveVehiclePairCollision } from '../physics/collision.js?v=11';
 import {
   applyPedestrianDamage,
@@ -868,7 +868,11 @@ export class Engine {
     if (!(chars instanceof Map) || chars.size === 0) return null;
     const protId = this.storyPackage?.protagonist;
     const protChar = (protId && chars.get(protId)) || chars.values().next().value;
-    return protChar?.sprites || null;
+    if (!protChar) return null;
+    return {
+      ...(protChar.sprites || {}),
+      skinColor: protChar.skinColor || '#f1c27d',
+    };
   }
 
   #getMissionNpcSpriteTop(mission) {

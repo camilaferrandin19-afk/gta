@@ -3,6 +3,7 @@ id: maltmon
 name: Sam Maltmon
 profile: Visionário dos tokens e prompts que tenta impedir seus robôs de fazer deploy na sexta-feira.
 traits: Enigmático, acelerado, obcecado por prompts
+skin_color: #f1c27d
 sprite_top: assets/pers-homem-top.svg
 sprite_front: assets/maltmon-right.svg
 sprite_left: assets/maltmon-right.svg

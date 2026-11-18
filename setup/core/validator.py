@@ -91,6 +91,8 @@ def validate_story(pkg: StoryPackage, app_root: Path | None = None) -> list[str]
                 errors.append(f'Personagem "{cid}" ({view_name}): arquivo ausente "{rel_path}".')
         if char.sprite_cutscene and story_dir and not (story_dir / char.sprite_cutscene).is_file():
             errors.append(f'Personagem "{cid}" (sprite_cutscene): arquivo ausente "{char.sprite_cutscene}".')
+        if char.skin_color and not HEX_COLOR_RE.match(char.skin_color):
+            errors.append(f'Personagem "{cid}": cor de pele inválida "{char.skin_color}". Use #rrggbb.')
 
     for iid, item in pkg.items.items():
         if not item.name.strip():

@@ -176,6 +176,7 @@ export function parseCharacterMarkdown(rawText, fileName = 'character.md') {
     name: meta.name,
     profile: meta.profile || '',
     traits: meta.traits || '',
+    skinColor: String(meta.skin_color || '#f1c27d').trim() || '#f1c27d',
     sprites: {
       top: validateAssetPath(meta.sprite_top || '', fileName, 2),
       front: validateAssetPath(meta.sprite_front || '', fileName, 2),

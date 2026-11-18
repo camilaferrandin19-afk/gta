@@ -159,6 +159,7 @@ def parse_character_markdown(raw_text: str, file_name: str) -> Character:
         sprite_left=meta.get('sprite_left', '').strip(),
         sprite_right=meta.get('sprite_right', '').strip(),
         sprite_cutscene=meta.get('sprite_cutscene', meta.get('cutscene_image', '')).strip(),
+        skin_color=(meta.get('skin_color', '#f1c27d').strip() or '#f1c27d'),
     )
 
 
@@ -168,6 +169,7 @@ def serialize_character_markdown(char: Character) -> str:
         ('name', char.name),
         ('profile', char.profile),
         ('traits', char.traits),
+        ('skin_color', char.skin_color or '#f1c27d'),
         ('sprite_top', char.sprite_top),
         ('sprite_front', char.sprite_front),
         ('sprite_left', char.sprite_left),

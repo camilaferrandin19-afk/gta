@@ -43,6 +43,17 @@ function hexToRgba(hex = '#ffffff', alpha = 1) {
   ];
 }
 
+function hexToRgb01(hex, fallback = [0.945, 0.761, 0.49]) {
+  if (typeof hex !== 'string') return fallback;
+  const clean = hex.trim().replace(/^#/, '');
+  if (!/^[0-9a-fA-F]{6}$/.test(clean)) return fallback;
+  return [
+    parseInt(clean.slice(0, 2), 16) / 255,
+    parseInt(clean.slice(2, 4), 16) / 255,
+    parseInt(clean.slice(4, 6), 16) / 255,
+  ];
+}
+
 export class WebGLRenderer {
   constructor(canvas) {
     this.canvas = canvas;
@@ -940,10 +951,25 @@ export class WebGLRenderer {
       const swing = !ridingMoto && player.speed > 5 && !player.ejected?.active ? Math.sin(player.walkPhase || 0) * 6 : 0;
       const cos = Math.cos(player.angle);
       const sin = Math.sin(player.angle);
-      const drawLimb = (forwardOffset, sideOffset, w, h, color, rotOffset = 0) => {
+      const skinRgb = hexToRgb01(playerSprites?.skinColor);
+      const pantsRgb = [0.16, 0.23, 0.36];
+      const shoeRgb = [0.88, 0.91, 0.96];
+      const drawLimb = (forwardOffset, sideOffset, w, h, color, rotOffset = 0, tex = 'solid') => {
         const lx = player.x + (cos * forwardOffset - sin * sideOffset) * pScale;
         const ly = player.y + (sin * forwardOffset + cos * sideOffset) * pScale;
-        this.#pushQuad(lx - w * 0.5 * pScale, ly - h * 0.5 * pScale, w * pScale, h * pScale, player.angle + rotOffset, 'solid', [color[0], color[1], color[2], pAlpha]);
+        this.#pushQuad(lx - w * 0.5 * pScale, ly - h * 0.5 * pScale, w * pScale, h * pScale, player.angle + rotOffset, tex, [color[0], color[1], color[2], pAlpha]);
+      };
+      const drawArm = (fwd, side, rotOffset = 0) => {
+        const aCos = Math.cos(rotOffset);
+        const aSin = Math.sin(rotOffset);
+        drawLimb(fwd, side, 7.5, 4.4, skinRgb, rotOffset, 'disc');
+        drawLimb(fwd + 3.6 * aCos, side + 3.6 * aSin, 4.8, 4.8, skinRgb, rotOffset, 'disc');
+      };
+      const drawLeg = (fwd, side, rotOffset = 0) => {
+        const aCos = Math.cos(rotOffset);
+        const aSin = Math.sin(rotOffset);
+        drawLimb(fwd, side, 8.2, 5.4, pantsRgb, rotOffset, 'disc');
+        drawLimb(fwd + 3.8 * aCos, side + 3.8 * aSin, 5.2, 4.6, shoeRgb, rotOffset, 'disc');
       };
 
       const isFallen = Boolean((player.isDead || (player.knockdownTimer || 0) > 0) && !ridingMoto);
@@ -954,21 +980,21 @@ export class WebGLRenderer {
 
       if (ridingMoto) {
         // Braços estendidos segurando o guidão
-        drawLimb(8, -7, 9, 4, [0.92, 0.72, 0.52]);
-        drawLimb(8, 7, 9, 4, [0.92, 0.72, 0.52]);
+        drawArm(7.5, -7.2, 0.15);
+        drawArm(7.5, 7.2, -0.15);
       } else if (isFallen) {
         // Braços e pernas padrão esparramados ao cair no chão
-        drawLimb(-8.5, -4.5, 11, 5, [0.15, 0.22, 0.35], 0.2);
-        drawLimb(-8.5, 4.5, 11, 5, [0.15, 0.22, 0.35], -0.2);
-        drawLimb(3.5, -10.5, 9, 4.5, [0.92, 0.72, 0.52], -0.6);
-        drawLimb(2.5, 10.5, 9, 4.5, [0.92, 0.72, 0.52], 0.55);
+        drawLeg(-9.5, -4.5, 2.85);
+        drawLeg(-9.5, 4.5, -2.85);
+        drawArm(3.0, -10.5, -0.65);
+        drawArm(2.2, 10.5, 0.6);
       } else {
-        // Pernas alternadas
-        drawLimb(swing, -5, 9, 6, [0.15, 0.22, 0.35]);
-        drawLimb(-swing, 5, 9, 6, [0.15, 0.22, 0.35]);
-        // Braços alternados (opostos às pernas)
-        drawLimb(-swing * 0.85 + 2, -11, 8, 5, [0.92, 0.72, 0.52]);
-        drawLimb(swing * 0.85 + 2, 11, 8, 5, [0.92, 0.72, 0.52]);
+        // Pernas alternadas com calça arredondada e tênis
+        drawLeg(swing, -5.0, 0);
+        drawLeg(-swing, 5.0, 0);
+        // Braços alternados (opostos às pernas) com antebraço e mão na cor da pele
+        drawArm(-swing * 0.85 + 2.0, -11.0, 0);
+        drawArm(swing * 0.85 + 2.0, 11.0, 0);
       }
 
       if (hasCustomSprite) {

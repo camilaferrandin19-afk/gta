@@ -3,7 +3,9 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Callable
 
+from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
+    QColorDialog,
     QFormLayout,
     QGroupBox,
     QHBoxLayout,
@@ -73,6 +75,25 @@ class CharactersTab(QWidget):
         self.profile_edit = QLineEdit()
         self.traits_edit = QLineEdit()
 
+        self._skin_color = '#f1c27d'
+        skin_row = QHBoxLayout()
+        skin_row.setContentsMargins(0, 0, 0, 0)
+        skin_row.setSpacing(6)
+        self.skin_swatch = QPushButton()
+        self.skin_swatch.setFixedSize(28, 28)
+        self.skin_swatch.clicked.connect(self._on_pick_skin_color)
+        self.skin_edit = QLineEdit('#f1c27d')
+        self.skin_edit.setMaximumWidth(110)
+        self.skin_pick_btn = QPushButton('Cor...')
+        self.skin_pick_btn.clicked.connect(self._on_pick_skin_color)
+        self.skin_default_btn = QPushButton('Bege padrão')
+        self.skin_default_btn.clicked.connect(lambda: self._set_skin_color('#f1c27d', sync=True))
+        skin_row.addWidget(self.skin_swatch)
+        skin_row.addWidget(self.skin_edit)
+        skin_row.addWidget(self.skin_pick_btn)
+        skin_row.addWidget(self.skin_default_btn)
+        skin_row.addStretch(1)
+
         self.top_picker = AssetPickerRow(story_dir_provider, subdir='assets', on_changed=lambda _: self._sync())
         self.front_picker = AssetPickerRow(story_dir_provider, subdir='assets', on_changed=lambda _: self._sync())
         self.left_picker = AssetPickerRow(story_dir_provider, subdir='assets', on_changed=lambda _: self._sync())
@@ -88,6 +109,7 @@ class CharactersTab(QWidget):
         form.addRow('Nome:', self.name_edit)
         form.addRow('Perfil:', self.profile_edit)
         form.addRow('Características:', self.traits_edit)
+        form.addRow('Cor da pele:', skin_row)
         form.addRow('Visão superior (top):', self.top_picker)
         form.addRow('Visão frontal (front):', self.front_picker)
         form.addRow('Visão esquerda (left):', self.left_picker)
@@ -101,6 +123,35 @@ class CharactersTab(QWidget):
         self.name_edit.textChanged.connect(self._sync)
         self.profile_edit.textChanged.connect(self._sync)
         self.traits_edit.textChanged.connect(self._sync)
+        self.skin_edit.textChanged.connect(self._on_skin_text_changed)
+        self._set_skin_color('#f1c27d', sync=False)
+
+    def _set_skin_color(self, hex_color: str, sync: bool = False) -> None:
+        clean = (hex_color or '#f1c27d').strip() or '#f1c27d'
+        self._skin_color = clean
+        self.skin_edit.blockSignals(True)
+        self.skin_edit.setText(clean)
+        self.skin_edit.blockSignals(False)
+        self.skin_swatch.setStyleSheet(
+            f'background: {clean}; border: 1px solid #475569; border-radius: 4px;'
+        )
+        if sync:
+            self._sync()
+
+    def _on_skin_text_changed(self, txt: str) -> None:
+        clean = txt.strip()
+        if QColor(clean).isValid():
+            self._skin_color = clean
+            self.skin_swatch.setStyleSheet(
+                f'background: {clean}; border: 1px solid #475569; border-radius: 4px;'
+            )
+            self._sync()
+
+    def _on_pick_skin_color(self) -> None:
+        initial = QColor(self._skin_color or '#f1c27d')
+        color = QColorDialog.getColor(initial, self, 'Escolher cor da pele')
+        if color.isValid():
+            self._set_skin_color(color.name(), sync=True)
 
     def load_package(self, pkg: StoryPackage | None) -> None:
         self._pkg = pkg
@@ -127,6 +178,7 @@ class CharactersTab(QWidget):
         self.name_edit.clear()
         self.profile_edit.clear()
         self.traits_edit.clear()
+        self._set_skin_color('#f1c27d', sync=False)
         self.top_picker.set_value('')
         self.front_picker.set_value('')
         self.left_picker.set_value('')
@@ -145,6 +197,7 @@ class CharactersTab(QWidget):
         self.name_edit.setText(char.name)
         self.profile_edit.setText(char.profile)
         self.traits_edit.setText(char.traits)
+        self._set_skin_color(char.skin_color or '#f1c27d', sync=False)
         self.top_picker.set_value(char.sprite_top)
         self.front_picker.set_value(char.sprite_front)
         self.left_picker.set_value(char.sprite_left)
@@ -161,6 +214,7 @@ class CharactersTab(QWidget):
         char.name = self.name_edit.text().strip()
         char.profile = self.profile_edit.text().strip()
         char.traits = self.traits_edit.text().strip()
+        char.skin_color = self._skin_color or '#f1c27d'
         char.sprite_top = self.top_picker.value()
         char.sprite_front = self.front_picker.value()
         char.sprite_left = self.left_picker.value()
