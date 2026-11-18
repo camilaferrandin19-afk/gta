@@ -77,13 +77,17 @@ class ItemPickerDialog(QDialog):
         app_root: Path,
         pkg: StoryPackage,
         current_item_id: str = '',
+        excluded_item_ids: set[str] | None = None,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
         self._app_root = app_root
         self._pkg = pkg
         self._story_dir = app_root / 'story' / pkg.id
+        self._excluded = set(excluded_item_ids or set())
         self.selected_item_id = (current_item_id or '').strip()
+        if self.selected_item_id in self._excluded:
+            self.selected_item_id = ''
         self._cards: dict[str, _ItemGridCard] = {}
 
         self.setWindowTitle('Escolher Item')
@@ -104,15 +108,15 @@ class ItemPickerDialog(QDialog):
         grid.setContentsMargins(10, 10, 10, 10)
         grid.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
 
-        ordered_ids = list(pkg.items_order) + [
-            iid for iid in pkg.collectibles_order if iid not in pkg.items_order
-        ]
+        ordered_ids = list(pkg.items_order)
         for iid in pkg.items:
             if iid not in ordered_ids:
                 ordered_ids.append(iid)
 
         idx = 0
         for iid in ordered_ids:
+            if iid in self._excluded:
+                continue
             item = pkg.items.get(iid)
             if not item:
                 continue
@@ -158,7 +162,10 @@ class ItemPickerDialog(QDialog):
 
         item = self._pkg.items.get(self.selected_item_id) if self.selected_item_id else None
         if not item:
-            self.selection_label.setText('Nenhum item selecionado.')
+            if not self._cards:
+                self.selection_label.setText('Nenhum item disponível (todos já estão posicionados no mapa).')
+            else:
+                self.selection_label.setText('Nenhum item selecionado.')
             self._ok_btn.setEnabled(False)
             return
 
