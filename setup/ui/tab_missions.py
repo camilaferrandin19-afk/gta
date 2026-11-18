@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QScrollArea,
+    QSizePolicy,
     QSplitter,
     QTableWidget,
     QTableWidgetItem,
@@ -42,6 +43,12 @@ def _set_combo_by_data(combo: QComboBox, value: str) -> None:
         combo.setCurrentIndex(idx)
     elif combo.count() > 0:
         combo.setCurrentIndex(0)
+
+
+def _configure_expanding_form(form: QFormLayout, widgets: tuple[QWidget, ...] = ()) -> None:
+    form.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow)
+    for w in widgets:
+        w.setSizePolicy(QSizePolicy.Policy.Expanding, w.sizePolicy().verticalPolicy())
 
 
 class CutsceneStepDialog(QDialog):
@@ -193,6 +200,7 @@ class CutsceneEditorWidget(QGroupBox):
         self.left_combo = QComboBox()
         self.right_combo = QComboBox()
         self.bg_edit = QLineEdit()
+        _configure_expanding_form(top_form, (self.left_combo, self.right_combo, self.bg_edit))
         top_form.addRow('Personagem esq.:', self.left_combo)
         top_form.addRow('Personagem dir.:', self.right_combo)
         top_form.addRow('Cenário (bg):', self.bg_edit)
@@ -407,6 +415,22 @@ class MissionsAndEncountersTab(QWidget):
         self.m_require_item = QComboBox()
         self.m_delivery_prompt = RichTextLineWidget(self._app_root, self._pkg_provider, on_changed=lambda _: self._sync_mission())
         self.m_wrong_msg = RichTextLineWidget(self._app_root, self._pkg_provider, on_changed=lambda _: self._sync_mission())
+        _configure_expanding_form(
+            form,
+            (
+                self.m_id,
+                self.m_title,
+                self.m_start,
+                self.m_pickup,
+                self.m_pickup_obj,
+                self.m_target,
+                self.m_objective,
+                self.m_give_item,
+                self.m_require_item,
+                self.m_delivery_prompt,
+                self.m_wrong_msg,
+            ),
+        )
 
         form.addRow('ID:', self.m_id)
         form.addRow('Título:', self.m_title)
@@ -437,7 +461,7 @@ class MissionsAndEncountersTab(QWidget):
 
         splitter.addWidget(left_panel)
         splitter.addWidget(scroll)
-        splitter.setSizes([260, 640])
+        splitter.setSizes([230, 670])
 
         self.m_title.textChanged.connect(self._sync_mission)
         self.m_give_item.currentIndexChanged.connect(self._sync_mission)
@@ -479,6 +503,7 @@ class MissionsAndEncountersTab(QWidget):
             on_changed=lambda _: self._sync_enc(),
         )
         self.e_prompt = RichTextLineWidget(self._app_root, self._pkg_provider, on_changed=lambda _: self._sync_enc())
+        _configure_expanding_form(form, (self.e_id, self.e_npc, self.e_loc, self.e_prompt))
         form.addRow('ID:', self.e_id)
         form.addRow('Personagem NPC:', self.e_npc)
         form.addRow('Edificação (CASA/COM):', self.e_loc)
@@ -490,7 +515,7 @@ class MissionsAndEncountersTab(QWidget):
 
         splitter.addWidget(left_panel)
         splitter.addWidget(right_container)
-        splitter.setSizes([260, 640])
+        splitter.setSizes([230, 670])
 
         self.e_npc.currentIndexChanged.connect(self._sync_enc)
         return splitter
