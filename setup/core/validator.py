@@ -62,6 +62,8 @@ def validate_story(pkg: StoryPackage, app_root: Path | None = None) -> list[str]
                 errors.append(f'Personagem "{cid}" está sem imagem em {view_name}.')
             elif story_dir and not (story_dir / rel_path).is_file():
                 errors.append(f'Personagem "{cid}" ({view_name}): arquivo ausente "{rel_path}".')
+        if char.sprite_cutscene and story_dir and not (story_dir / char.sprite_cutscene).is_file():
+            errors.append(f'Personagem "{cid}" (sprite_cutscene): arquivo ausente "{char.sprite_cutscene}".')
 
     for iid, item in pkg.items.items():
         if not item.name.strip():

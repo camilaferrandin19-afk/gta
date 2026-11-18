@@ -77,6 +77,12 @@ class CharactersTab(QWidget):
         self.front_picker = AssetPickerRow(story_dir_provider, subdir='assets', on_changed=lambda _: self._sync())
         self.left_picker = AssetPickerRow(story_dir_provider, subdir='assets', on_changed=lambda _: self._sync())
         self.right_picker = AssetPickerRow(story_dir_provider, subdir='assets', on_changed=lambda _: self._sync())
+        self.cutscene_picker = AssetPickerRow(
+            story_dir_provider,
+            subdir='assets',
+            allow_clear=True,
+            on_changed=lambda _: self._sync(),
+        )
 
         form.addRow('ID:', self.id_edit)
         form.addRow('Nome:', self.name_edit)
@@ -86,6 +92,7 @@ class CharactersTab(QWidget):
         form.addRow('Visão frontal (front):', self.front_picker)
         form.addRow('Visão esquerda (left):', self.left_picker)
         form.addRow('Visão direita (right):', self.right_picker)
+        form.addRow('Retrato Cutscene (PNG):', self.cutscene_picker)
 
         splitter.addWidget(left_panel)
         splitter.addWidget(right_group)
@@ -124,6 +131,7 @@ class CharactersTab(QWidget):
         self.front_picker.set_value('')
         self.left_picker.set_value('')
         self.right_picker.set_value('')
+        self.cutscene_picker.set_value('')
 
     def _on_selected(self, current: QListWidgetItem | None) -> None:
         if not current or not self._pkg:
@@ -141,6 +149,7 @@ class CharactersTab(QWidget):
         self.front_picker.set_value(char.sprite_front)
         self.left_picker.set_value(char.sprite_left)
         self.right_picker.set_value(char.sprite_right)
+        self.cutscene_picker.set_value(char.sprite_cutscene)
         self._current_id = cid
 
     def _sync(self) -> None:
@@ -156,6 +165,7 @@ class CharactersTab(QWidget):
         char.sprite_front = self.front_picker.value()
         char.sprite_left = self.left_picker.value()
         char.sprite_right = self.right_picker.value()
+        char.sprite_cutscene = self.cutscene_picker.value()
         item = self.char_list.currentItem()
         if item:
             item.setText(f'{char.name or char.id} ({char.id})')

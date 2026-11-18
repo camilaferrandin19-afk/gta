@@ -25,6 +25,7 @@ class Character:
     sprite_front: str = ''
     sprite_left: str = ''
     sprite_right: str = ''
+    sprite_cutscene: str = ''
 
 
 @dataclass

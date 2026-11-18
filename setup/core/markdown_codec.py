@@ -133,6 +133,7 @@ def parse_character_markdown(raw_text: str, file_name: str) -> Character:
         sprite_front=meta.get('sprite_front', '').strip(),
         sprite_left=meta.get('sprite_left', '').strip(),
         sprite_right=meta.get('sprite_right', '').strip(),
+        sprite_cutscene=meta.get('sprite_cutscene', meta.get('cutscene_image', '')).strip(),
     )
 
 
@@ -146,6 +147,7 @@ def serialize_character_markdown(char: Character) -> str:
         ('sprite_front', char.sprite_front),
         ('sprite_left', char.sprite_left),
         ('sprite_right', char.sprite_right),
+        ('sprite_cutscene', char.sprite_cutscene),
     ])
 
 

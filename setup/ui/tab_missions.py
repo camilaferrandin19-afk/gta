@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 import re
 from typing import Callable
 
@@ -12,7 +13,6 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QHeaderView,
     QInputDialog,
-    QLabel,
     QLineEdit,
     QListWidget,
     QListWidgetItem,
@@ -28,55 +28,139 @@ from PySide6.QtWidgets import (
 )
 
 from ..core.models import CutsceneBlock, CutsceneStep, Encounter, Mission, StoryPackage
+from .map_picker import LocationPickerField
 
 
 SLUG_RE = re.compile(r'^[a-z0-9]+(?:-[a-z0-9]+)*$')
 
 
-class CutsceneStepDialog(QDialog):
-    """Diálogo guiado para adicionar ou editar um passo de cutscene."""
+def _set_combo_by_data(combo: QComboBox, value: str) -> None:
+    idx = combo.findData(value)
+    if idx >= 0:
+        combo.setCurrentIndex(idx)
+    elif combo.count() > 0:
+        combo.setCurrentIndex(0)
 
-    def __init__(self, step: CutsceneStep | None = None, parent: QWidget | None = None) -> None:
+
+class CutsceneStepDialog(QDialog):
+    """Diálogo guiado para adicionar ou editar um passo de cutscene sem digitação livre de IDs."""
+
+    def __init__(
+        self,
+        characters: list[tuple[str, str]],
+        items: list[tuple[str, str]],
+        step: CutsceneStep | None = None,
+        parent: QWidget | None = None,
+    ) -> None:
         super().__init__(parent)
         self.setWindowTitle('Passo da Cutscene')
-        self.resize(480, 260)
+        self.resize(500, 290)
 
         layout = QVBoxLayout(self)
-        form = QFormLayout()
+        self.form = QFormLayout()
 
         self.kind_combo = QComboBox()
-        self.kind_combo.addItems(['line', 'choice', 'deliver', 'link'])
-        self.speaker_edit = QLineEdit()
+        self.kind_combo.addItem('Fala de personagem (line)', 'line')
+        self.kind_combo.addItem('Opção de escolha (choice)', 'choice')
+        self.kind_combo.addItem('Entregar item (deliver)', 'deliver')
+        self.kind_combo.addItem('Botão de link externo (link)', 'link')
+
+        self.speaker_combo = QComboBox()
+        for cid, cname in characters:
+            self.speaker_combo.addItem(f'{cname} ({cid})', cname)
+
+        self.deliver_combo = QComboBox()
+        for iid, iname in items:
+            self.deliver_combo.addItem(f'{iname} ({iid})', iid)
+
         self.text_edit = QLineEdit()
-        self.target_edit = QLineEdit()
+        self.choice_target_combo = QComboBox()
+        self.choice_target_combo.addItems(['NEXT', 'FAIL'])
+        self.url_edit = QLineEdit()
+        self.url_edit.setPlaceholderText('https://...')
         self.reason_edit = QLineEdit()
 
-        form.addRow('Tipo:', self.kind_combo)
-        form.addRow('Falante (line):', self.speaker_edit)
-        form.addRow('Texto / Rótulo / Item:', self.text_edit)
-        form.addRow('Destino (NEXT/FAIL/URL):', self.target_edit)
-        form.addRow('Motivo falha (FAIL):', self.reason_edit)
+        self.form.addRow('Tipo:', self.kind_combo)
+        self.form.addRow('Falante:', self.speaker_combo)
+        self.form.addRow('Item a entregar:', self.deliver_combo)
+        self.form.addRow('Texto / Rótulo:', self.text_edit)
+        self.form.addRow('Destino (escolha):', self.choice_target_combo)
+        self.form.addRow('URL (link):', self.url_edit)
+        self.form.addRow('Motivo falha (FAIL):', self.reason_edit)
 
-        layout.addLayout(form)
+        layout.addLayout(self.form)
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
 
         if step:
-            self.kind_combo.setCurrentText(step.kind)
-            self.speaker_edit.setText(step.speaker)
-            self.text_edit.setText(step.text)
-            self.target_edit.setText(step.target)
-            self.reason_edit.setText(step.reason)
+            _set_combo_by_data(self.kind_combo, step.kind)
+            if step.kind == 'line':
+                idx = self.speaker_combo.findData(step.speaker)
+                if idx < 0:
+                    for i in range(self.speaker_combo.count()):
+                        if self.speaker_combo.itemData(i).lower() == step.speaker.lower():
+                            idx = i
+                            break
+                if idx >= 0:
+                    self.speaker_combo.setCurrentIndex(idx)
+                self.text_edit.setText(step.text)
+            elif step.kind == 'deliver':
+                _set_combo_by_data(self.deliver_combo, step.text)
+            elif step.kind == 'choice':
+                self.text_edit.setText(step.text)
+                self.choice_target_combo.setCurrentText(step.target or 'NEXT')
+                self.reason_edit.setText(step.reason)
+            elif step.kind == 'link':
+                self.text_edit.setText(step.text)
+                self.url_edit.setText(step.target)
+
+        self.kind_combo.currentIndexChanged.connect(self._update_visibility)
+        self.choice_target_combo.currentTextChanged.connect(self._update_visibility)
+        self._update_visibility()
+
+    def _set_row_visible(self, field: QWidget, visible: bool) -> None:
+        label = self.form.labelForField(field)
+        field.setVisible(visible)
+        if label:
+            label.setVisible(visible)
+
+    def _update_visibility(self) -> None:
+        kind = self.kind_combo.currentData()
+        self._set_row_visible(self.speaker_combo, kind == 'line')
+        self._set_row_visible(self.deliver_combo, kind == 'deliver')
+        self._set_row_visible(self.text_edit, kind in ('line', 'choice', 'link'))
+        self._set_row_visible(self.choice_target_combo, kind == 'choice')
+        self._set_row_visible(self.url_edit, kind == 'link')
+        is_fail = kind == 'choice' and self.choice_target_combo.currentText() == 'FAIL'
+        self._set_row_visible(self.reason_edit, is_fail)
 
     def to_step(self) -> CutsceneStep:
+        kind = str(self.kind_combo.currentData())
+        if kind == 'line':
+            return CutsceneStep(
+                kind='line',
+                speaker=str(self.speaker_combo.currentData() or ''),
+                text=self.text_edit.text().strip(),
+            )
+        if kind == 'deliver':
+            return CutsceneStep(
+                kind='deliver',
+                text=str(self.deliver_combo.currentData() or ''),
+            )
+        if kind == 'link':
+            return CutsceneStep(
+                kind='link',
+                text=self.text_edit.text().strip() or 'Visualizar o link',
+                target=self.url_edit.text().strip(),
+            )
+        target = self.choice_target_combo.currentText()
         return CutsceneStep(
-            kind=self.kind_combo.currentText(),
-            speaker=self.speaker_edit.text().strip(),
+            kind='choice',
             text=self.text_edit.text().strip(),
-            target=self.target_edit.text().strip() or 'NEXT',
-            reason=self.reason_edit.text().strip(),
+            target=target,
+            reason=self.reason_edit.text().strip() if target == 'FAIL' else '',
         )
 
 
@@ -88,13 +172,13 @@ class CutsceneEditorWidget(QGroupBox):
         self._block: CutsceneBlock | None = None
         self._on_changed = on_changed
         self._suppress = False
+        self._characters: list[tuple[str, str]] = []
+        self._items: list[tuple[str, str]] = []
 
         layout = QVBoxLayout(self)
         top_form = QFormLayout()
         self.left_combo = QComboBox()
-        self.left_combo.setEditable(True)
         self.right_combo = QComboBox()
-        self.right_combo.setEditable(True)
         self.bg_edit = QLineEdit()
         top_form.addRow('Personagem esq.:', self.left_combo)
         top_form.addRow('Personagem dir.:', self.right_combo)
@@ -121,35 +205,37 @@ class CutsceneEditorWidget(QGroupBox):
             btn_row.addWidget(btn)
         layout.addLayout(btn_row)
 
-        self.left_combo.currentTextChanged.connect(self._sync_meta)
-        self.right_combo.currentTextChanged.connect(self._sync_meta)
+        self.left_combo.currentIndexChanged.connect(self._sync_meta)
+        self.right_combo.currentIndexChanged.connect(self._sync_meta)
         self.bg_edit.textChanged.connect(self._sync_meta)
 
-    def set_character_choices(self, char_ids: list[str]) -> None:
+    def set_choices(self, characters: list[tuple[str, str]], items: list[tuple[str, str]]) -> None:
         self._suppress = True
-        cur_left = self.left_combo.currentText()
-        cur_right = self.right_combo.currentText()
-        choices = [''] + char_ids + ['none']
-        self.left_combo.clear()
-        self.right_combo.clear()
-        self.left_combo.addItems(choices)
-        self.right_combo.addItems(choices)
-        self.left_combo.setCurrentText(cur_left)
-        self.right_combo.setCurrentText(cur_right)
+        self._characters = characters
+        self._items = items
+        cur_left = str(self.left_combo.currentData() or '')
+        cur_right = str(self.right_combo.currentData() or '')
+
+        for combo, cur_val in ((self.left_combo, cur_left), (self.right_combo, cur_right)):
+            combo.clear()
+            combo.addItem('(nenhum)', 'none')
+            for cid, cname in characters:
+                combo.addItem(f'{cname} ({cid})', cid)
+            _set_combo_by_data(combo, cur_val or 'none')
         self._suppress = False
 
     def load_block(self, block: CutsceneBlock | None) -> None:
         self._suppress = True
         self._block = block
         if not block:
-            self.left_combo.setCurrentText('')
-            self.right_combo.setCurrentText('')
+            _set_combo_by_data(self.left_combo, 'none')
+            _set_combo_by_data(self.right_combo, 'none')
             self.bg_edit.clear()
             self.table.setRowCount(0)
             self._suppress = False
             return
-        self.left_combo.setCurrentText(block.left)
-        self.right_combo.setCurrentText(block.right)
+        _set_combo_by_data(self.left_combo, block.left or 'none')
+        _set_combo_by_data(self.right_combo, block.right or 'none')
         self.bg_edit.setText(block.bg)
         self._refresh_table()
         self._suppress = False
@@ -169,8 +255,8 @@ class CutsceneEditorWidget(QGroupBox):
     def _sync_meta(self) -> None:
         if self._suppress or not self._block:
             return
-        self._block.left = self.left_combo.currentText().strip()
-        self._block.right = self.right_combo.currentText().strip()
+        self._block.left = str(self.left_combo.currentData() or 'none')
+        self._block.right = str(self.right_combo.currentData() or 'none')
         self._block.bg = self.bg_edit.text().strip()
         if self._on_changed:
             self._on_changed()
@@ -178,7 +264,7 @@ class CutsceneEditorWidget(QGroupBox):
     def _on_add_step(self) -> None:
         if not self._block:
             return
-        dlg = CutsceneStepDialog(parent=self)
+        dlg = CutsceneStepDialog(self._characters, self._items, parent=self)
         if dlg.exec() == QDialog.DialogCode.Accepted:
             self._block.steps.append(dlg.to_step())
             self._refresh_table()
@@ -189,7 +275,7 @@ class CutsceneEditorWidget(QGroupBox):
         row = self.table.currentRow()
         if not self._block or row < 0 or row >= len(self._block.steps):
             return
-        dlg = CutsceneStepDialog(self._block.steps[row], parent=self)
+        dlg = CutsceneStepDialog(self._characters, self._items, self._block.steps[row], parent=self)
         if dlg.exec() == QDialog.DialogCode.Accepted:
             self._block.steps[row] = dlg.to_step()
             self._refresh_table()
@@ -222,8 +308,14 @@ class CutsceneEditorWidget(QGroupBox):
 class MissionsAndEncountersTab(QWidget):
     """Aba unificada de Missões Principais (com reordenação) e Encontros Extras."""
 
-    def __init__(self, on_data_changed: Callable[[], None] | None = None, parent: QWidget | None = None) -> None:
+    def __init__(
+        self,
+        app_root: Path,
+        on_data_changed: Callable[[], None] | None = None,
+        parent: QWidget | None = None,
+    ) -> None:
         super().__init__(parent)
+        self._app_root = app_root
         self._pkg: StoryPackage | None = None
         self._current_mission_id: str | None = None
         self._current_enc_id: str | None = None
@@ -235,6 +327,9 @@ class MissionsAndEncountersTab(QWidget):
 
         self.subtabs.addTab(self._build_missions_tab(), 'Missões Principais')
         self.subtabs.addTab(self._build_encounters_tab(), 'Encontros Extras')
+
+    def _pkg_provider(self) -> StoryPackage | None:
+        return self._pkg
 
     def _build_missions_tab(self) -> QWidget:
         splitter = QSplitter()
@@ -276,15 +371,18 @@ class MissionsAndEncountersTab(QWidget):
         self.m_id = QLineEdit()
         self.m_id.setReadOnly(True)
         self.m_title = QLineEdit()
-        self.m_start = QLineEdit()
-        self.m_pickup = QLineEdit()
+        self.m_start = LocationPickerField(self._app_root, self._pkg_provider, on_changed=lambda _: self._sync_mission())
+        self.m_pickup = LocationPickerField(
+            self._app_root,
+            self._pkg_provider,
+            allow_clear=True,
+            on_changed=lambda _: self._sync_mission(),
+        )
         self.m_pickup_obj = QLineEdit()
-        self.m_target = QLineEdit()
+        self.m_target = LocationPickerField(self._app_root, self._pkg_provider, on_changed=lambda _: self._sync_mission())
         self.m_objective = QLineEdit()
         self.m_give_item = QComboBox()
-        self.m_give_item.setEditable(True)
         self.m_require_item = QComboBox()
-        self.m_require_item.setEditable(True)
         self.m_delivery_prompt = QLineEdit()
         self.m_wrong_msg = QLineEdit()
 
@@ -312,13 +410,10 @@ class MissionsAndEncountersTab(QWidget):
         splitter.addWidget(scroll)
         splitter.setSizes([260, 640])
 
-        for widget in (
-            self.m_title, self.m_start, self.m_pickup, self.m_pickup_obj,
-            self.m_target, self.m_objective, self.m_delivery_prompt, self.m_wrong_msg,
-        ):
+        for widget in (self.m_title, self.m_pickup_obj, self.m_objective, self.m_delivery_prompt, self.m_wrong_msg):
             widget.textChanged.connect(self._sync_mission)
-        self.m_give_item.currentTextChanged.connect(self._sync_mission)
-        self.m_require_item.currentTextChanged.connect(self._sync_mission)
+        self.m_give_item.currentIndexChanged.connect(self._sync_mission)
+        self.m_require_item.currentIndexChanged.connect(self._sync_mission)
 
         return splitter
 
@@ -349,8 +444,12 @@ class MissionsAndEncountersTab(QWidget):
         self.e_id = QLineEdit()
         self.e_id.setReadOnly(True)
         self.e_npc = QComboBox()
-        self.e_npc.setEditable(True)
-        self.e_loc = QLineEdit()
+        self.e_loc = LocationPickerField(
+            self._app_root,
+            self._pkg_provider,
+            buildings_only=True,
+            on_changed=lambda _: self._sync_enc(),
+        )
         self.e_prompt = QLineEdit()
         form.addRow('ID:', self.e_id)
         form.addRow('Personagem NPC:', self.e_npc)
@@ -365,8 +464,7 @@ class MissionsAndEncountersTab(QWidget):
         splitter.addWidget(right_container)
         splitter.setSizes([260, 640])
 
-        self.e_npc.currentTextChanged.connect(self._sync_enc)
-        self.e_loc.textChanged.connect(self._sync_enc)
+        self.e_npc.currentIndexChanged.connect(self._sync_enc)
         self.e_prompt.textChanged.connect(self._sync_enc)
         return splitter
 
@@ -404,25 +502,30 @@ class MissionsAndEncountersTab(QWidget):
     def refresh_reference_choices(self) -> None:
         if not self._pkg:
             return
-        char_ids = list(self._pkg.characters.keys())
-        item_ids = [''] + list(self._pkg.items.keys())
-        self.cs_inicio.set_character_choices(char_ids)
-        self.cs_fim.set_character_choices(char_ids)
-        self.e_cutscene.set_character_choices(char_ids)
+        characters = [(cid, c.name or cid) for cid, c in self._pkg.characters.items()]
+        items = [(iid, it.name or iid) for iid, it in self._pkg.items.items()]
 
-        cur_npc = self.e_npc.currentText()
+        self.cs_inicio.set_choices(characters, items)
+        self.cs_fim.set_choices(characters, items)
+        self.e_cutscene.set_choices(characters, items)
+
+        cur_npc = str(self.e_npc.currentData() or '')
+        self.e_npc.blockSignals(True)
         self.e_npc.clear()
-        self.e_npc.addItems(char_ids)
-        self.e_npc.setCurrentText(cur_npc)
+        for cid, cname in characters:
+            self.e_npc.addItem(f'{cname} ({cid})', cid)
+        _set_combo_by_data(self.e_npc, cur_npc)
+        self.e_npc.blockSignals(False)
 
-        cur_give = self.m_give_item.currentText()
-        cur_req = self.m_require_item.currentText()
-        self.m_give_item.clear()
-        self.m_require_item.clear()
-        self.m_give_item.addItems(item_ids)
-        self.m_require_item.addItems(item_ids)
-        self.m_give_item.setCurrentText(cur_give)
-        self.m_require_item.setCurrentText(cur_req)
+        for combo in (self.m_give_item, self.m_require_item):
+            cur_val = str(combo.currentData() or '')
+            combo.blockSignals(True)
+            combo.clear()
+            combo.addItem('(nenhum)', '')
+            for iid, iname in items:
+                combo.addItem(f'{iname} ({iid})', iid)
+            _set_combo_by_data(combo, cur_val)
+            combo.blockSignals(False)
 
     def _on_mission_selected(self, current: QListWidgetItem | None) -> None:
         if not current or not self._pkg:
@@ -434,13 +537,13 @@ class MissionsAndEncountersTab(QWidget):
         self._current_mission_id = None
         self.m_id.setText(m.id)
         self.m_title.setText(m.title)
-        self.m_start.setText(m.start)
-        self.m_pickup.setText(m.pickup)
+        self.m_start.set_code(m.start)
+        self.m_pickup.set_code(m.pickup)
         self.m_pickup_obj.setText(m.pickup_objective)
-        self.m_target.setText(m.target)
+        self.m_target.set_code(m.target)
         self.m_objective.setText(m.objective)
-        self.m_give_item.setCurrentText(m.give_item)
-        self.m_require_item.setCurrentText(m.require_item)
+        _set_combo_by_data(self.m_give_item, m.give_item)
+        _set_combo_by_data(self.m_require_item, m.require_item)
         self.m_delivery_prompt.setText(m.delivery_prompt)
         self.m_wrong_msg.setText(m.wrong_item_message)
         self.cs_inicio.load_block(m.cutscene_inicio)
@@ -454,13 +557,13 @@ class MissionsAndEncountersTab(QWidget):
         if not m:
             return
         m.title = self.m_title.text().strip()
-        m.start = self.m_start.text().strip().upper()
-        m.pickup = self.m_pickup.text().strip().upper()
+        m.start = self.m_start.code()
+        m.pickup = self.m_pickup.code()
         m.pickup_objective = self.m_pickup_obj.text().strip()
-        m.target = self.m_target.text().strip().upper()
+        m.target = self.m_target.code()
         m.objective = self.m_objective.text().strip()
-        m.give_item = self.m_give_item.currentText().strip()
-        m.require_item = self.m_require_item.currentText().strip()
+        m.give_item = str(self.m_give_item.currentData() or '')
+        m.require_item = str(self.m_require_item.currentData() or '')
         m.delivery_prompt = self.m_delivery_prompt.text().strip()
         m.wrong_item_message = self.m_wrong_msg.text().strip()
         item = self.mission_list.currentItem()
@@ -483,7 +586,7 @@ class MissionsAndEncountersTab(QWidget):
             QMessageBox.warning(self, 'Duplicado', f'Já existe uma missão "{mid}".')
             return
         chars = list(self._pkg.characters.keys())
-        c1 = chars[0] if chars else ''
+        c1 = chars[0] if chars else 'none'
         c2 = chars[1] if len(chars) > 1 else c1
         m = Mission(
             id=mid,
@@ -537,8 +640,8 @@ class MissionsAndEncountersTab(QWidget):
             return
         self._current_enc_id = None
         self.e_id.setText(enc.id)
-        self.e_npc.setCurrentText(enc.npc)
-        self.e_loc.setText(enc.location)
+        _set_combo_by_data(self.e_npc, enc.npc)
+        self.e_loc.set_code(enc.location)
         self.e_prompt.setText(enc.prompt)
         self.e_cutscene.load_block(enc.cutscene)
         self._current_enc_id = eid
@@ -549,8 +652,8 @@ class MissionsAndEncountersTab(QWidget):
         enc = self._pkg.encounters.get(self._current_enc_id)
         if not enc:
             return
-        enc.npc = self.e_npc.currentText().strip()
-        enc.location = self.e_loc.text().strip().upper()
+        enc.npc = str(self.e_npc.currentData() or '')
+        enc.location = self.e_loc.code()
         enc.prompt = self.e_prompt.text().strip()
         item = self.enc_list.currentItem()
         if item:
@@ -578,7 +681,7 @@ class MissionsAndEncountersTab(QWidget):
             npc=npc,
             location='CASA-01',
             prompt='Conversar na CASA-01',
-            cutscene=CutsceneBlock(name='CUTSCENE', left=npc, right=npc, bg='Interior da CASA-01'),
+            cutscene=CutsceneBlock(name='CUTSCENE', left=npc or 'none', right=npc or 'none', bg='Interior da CASA-01'),
         )
         self._pkg.encounters[eid] = enc
         self._pkg.encounters_order.append(eid)
