@@ -29,6 +29,7 @@ from PySide6.QtWidgets import (
 
 from ..core.models import CutsceneBlock, CutsceneStep, Encounter, Mission, StoryPackage
 from .map_picker import LocationPickerField
+from .rich_text_field import RichTextLineWidget
 
 
 SLUG_RE = re.compile(r'^[a-z0-9]+(?:-[a-z0-9]+)*$')
@@ -47,6 +48,8 @@ class CutsceneStepDialog(QDialog):
 
     def __init__(
         self,
+        app_root: Path,
+        pkg_provider: Callable[[], StoryPackage | None],
         characters: list[tuple[str, str]],
         items: list[tuple[str, str]],
         step: CutsceneStep | None = None,
@@ -54,7 +57,7 @@ class CutsceneStepDialog(QDialog):
     ) -> None:
         super().__init__(parent)
         self.setWindowTitle('Passo da Cutscene')
-        self.resize(500, 290)
+        self.resize(560, 320)
 
         layout = QVBoxLayout(self)
         self.form = QFormLayout()
@@ -73,7 +76,7 @@ class CutsceneStepDialog(QDialog):
         for iid, iname in items:
             self.deliver_combo.addItem(f'{iname} ({iid})', iid)
 
-        self.text_edit = QLineEdit()
+        self.text_edit = RichTextLineWidget(app_root, pkg_provider, placeholder='Use B/I/U ou + Local / + Item / + Personagem')
         self.choice_target_combo = QComboBox()
         self.choice_target_combo.addItems(['NEXT', 'FAIL'])
         self.url_edit = QLineEdit()
@@ -167,8 +170,17 @@ class CutsceneStepDialog(QDialog):
 class CutsceneEditorWidget(QGroupBox):
     """Editor visual para um bloco de cutscene (left, right, bg e passos)."""
 
-    def __init__(self, title: str, on_changed: Callable[[], None] | None = None, parent: QWidget | None = None) -> None:
+    def __init__(
+        self,
+        title: str,
+        app_root: Path,
+        pkg_provider: Callable[[], StoryPackage | None],
+        on_changed: Callable[[], None] | None = None,
+        parent: QWidget | None = None,
+    ) -> None:
         super().__init__(title, parent)
+        self._app_root = app_root
+        self._pkg_provider = pkg_provider
         self._block: CutsceneBlock | None = None
         self._on_changed = on_changed
         self._suppress = False
@@ -264,7 +276,7 @@ class CutsceneEditorWidget(QGroupBox):
     def _on_add_step(self) -> None:
         if not self._block:
             return
-        dlg = CutsceneStepDialog(self._characters, self._items, parent=self)
+        dlg = CutsceneStepDialog(self._app_root, self._pkg_provider, self._characters, self._items, parent=self)
         if dlg.exec() == QDialog.DialogCode.Accepted:
             self._block.steps.append(dlg.to_step())
             self._refresh_table()
@@ -275,7 +287,14 @@ class CutsceneEditorWidget(QGroupBox):
         row = self.table.currentRow()
         if not self._block or row < 0 or row >= len(self._block.steps):
             return
-        dlg = CutsceneStepDialog(self._characters, self._items, self._block.steps[row], parent=self)
+        dlg = CutsceneStepDialog(
+            self._app_root,
+            self._pkg_provider,
+            self._characters,
+            self._items,
+            self._block.steps[row],
+            parent=self,
+        )
         if dlg.exec() == QDialog.DialogCode.Accepted:
             self._block.steps[row] = dlg.to_step()
             self._refresh_table()
@@ -378,13 +397,13 @@ class MissionsAndEncountersTab(QWidget):
             allow_clear=True,
             on_changed=lambda _: self._sync_mission(),
         )
-        self.m_pickup_obj = QLineEdit()
+        self.m_pickup_obj = RichTextLineWidget(self._app_root, self._pkg_provider, on_changed=lambda _: self._sync_mission())
         self.m_target = LocationPickerField(self._app_root, self._pkg_provider, on_changed=lambda _: self._sync_mission())
-        self.m_objective = QLineEdit()
+        self.m_objective = RichTextLineWidget(self._app_root, self._pkg_provider, on_changed=lambda _: self._sync_mission())
         self.m_give_item = QComboBox()
         self.m_require_item = QComboBox()
-        self.m_delivery_prompt = QLineEdit()
-        self.m_wrong_msg = QLineEdit()
+        self.m_delivery_prompt = RichTextLineWidget(self._app_root, self._pkg_provider, on_changed=lambda _: self._sync_mission())
+        self.m_wrong_msg = RichTextLineWidget(self._app_root, self._pkg_provider, on_changed=lambda _: self._sync_mission())
 
         form.addRow('ID:', self.m_id)
         form.addRow('Título:', self.m_title)
@@ -398,8 +417,8 @@ class MissionsAndEncountersTab(QWidget):
         form.addRow('Prompt entrega:', self.m_delivery_prompt)
         form.addRow('Msg item errado:', self.m_wrong_msg)
 
-        self.cs_inicio = CutsceneEditorWidget('Cutscene Inicial', on_changed=self._on_data_changed)
-        self.cs_fim = CutsceneEditorWidget('Cutscene Final', on_changed=self._on_data_changed)
+        self.cs_inicio = CutsceneEditorWidget('Cutscene Inicial', self._app_root, self._pkg_provider, on_changed=self._on_data_changed)
+        self.cs_fim = CutsceneEditorWidget('Cutscene Final', self._app_root, self._pkg_provider, on_changed=self._on_data_changed)
 
         right_layout.addWidget(form_group)
         right_layout.addWidget(self.cs_inicio)
@@ -410,8 +429,7 @@ class MissionsAndEncountersTab(QWidget):
         splitter.addWidget(scroll)
         splitter.setSizes([260, 640])
 
-        for widget in (self.m_title, self.m_pickup_obj, self.m_objective, self.m_delivery_prompt, self.m_wrong_msg):
-            widget.textChanged.connect(self._sync_mission)
+        self.m_title.textChanged.connect(self._sync_mission)
         self.m_give_item.currentIndexChanged.connect(self._sync_mission)
         self.m_require_item.currentIndexChanged.connect(self._sync_mission)
 
@@ -450,13 +468,13 @@ class MissionsAndEncountersTab(QWidget):
             buildings_only=True,
             on_changed=lambda _: self._sync_enc(),
         )
-        self.e_prompt = QLineEdit()
+        self.e_prompt = RichTextLineWidget(self._app_root, self._pkg_provider, on_changed=lambda _: self._sync_enc())
         form.addRow('ID:', self.e_id)
         form.addRow('Personagem NPC:', self.e_npc)
         form.addRow('Edificação (CASA/COM):', self.e_loc)
         form.addRow('Texto da ação:', self.e_prompt)
 
-        self.e_cutscene = CutsceneEditorWidget('Cutscene do Encontro', on_changed=self._on_data_changed)
+        self.e_cutscene = CutsceneEditorWidget('Cutscene do Encontro', self._app_root, self._pkg_provider, on_changed=self._on_data_changed)
         right_layout.addWidget(form_group)
         right_layout.addWidget(self.e_cutscene, 1)
 
@@ -465,7 +483,6 @@ class MissionsAndEncountersTab(QWidget):
         splitter.setSizes([260, 640])
 
         self.e_npc.currentIndexChanged.connect(self._sync_enc)
-        self.e_prompt.textChanged.connect(self._sync_enc)
         return splitter
 
     def load_package(self, pkg: StoryPackage | None) -> None:

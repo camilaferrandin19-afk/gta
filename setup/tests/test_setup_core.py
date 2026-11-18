@@ -77,11 +77,13 @@ class SetupCoreTests(unittest.TestCase):
         item_refs = find_dependents(pkg, 'item', 'caixa-secreta')
         self.assertTrue(len(item_refs) > 0)
 
-        # Quebra proposital: código de local inexistente e cor inválida em rua
+        # Quebra proposital: código de local inexistente, cor inválida em rua e marcador [ITEM-...] inválido
         pkg.missions['01-caixa-secreta'].target = 'CASA-9999'
+        pkg.missions['01-caixa-secreta'].objective = 'Pegue [ITEM-inexistente] em [CASA-9999]'
         pkg.locations['RUA-01'].roof_color = '#123456'
         errors = validate_story(pkg, self.app_copy)
         self.assertTrue(any('CASA-9999' in err for err in errors))
+        self.assertTrue(any('ITEM-inexistente' in err for err in errors))
         self.assertTrue(any('RUA-01' in err for err in errors))
 
     def test_map_roof_roundtrip_and_asset_import_validation(self) -> None:

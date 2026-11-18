@@ -9,6 +9,8 @@ from .models import CutsceneBlock, StoryPackage
 
 HEX_COLOR_RE = re.compile(r'^#[0-9a-fA-F]{6}$')
 URL_RE = re.compile(r'^https?://\S+$', re.IGNORECASE)
+BRACKET_TOKEN_RE = re.compile(r'\[([^\[\]\n]+)\]')
+LOC_CODE_RE = re.compile(r'^(RUA|CASA|COM|PRACA)-\d+$', re.IGNORECASE)
 
 
 def find_dependents(pkg: StoryPackage, kind: str, target_id: str) -> list[str]:
@@ -90,8 +92,13 @@ def validate_story(pkg: StoryPackage, app_root: Path | None = None) -> list[str]
         if mission.require_item and mission.require_item not in known_items:
             errors.append(f'Missão "{mid}" (require_item): item "{mission.require_item}" não cadastrado.')
 
-        _validate_cutscene_block(mission.cutscene_inicio, f'Missão "{mid}" ({mission.cutscene_inicio.name})', known_chars, known_items, errors)
-        _validate_cutscene_block(mission.cutscene_fim, f'Missão "{mid}" ({mission.cutscene_fim.name})', known_chars, known_items, errors)
+        _validate_bracket_placeholders(mission.objective, f'Missão "{mid}" (objective)', known_locations, known_items, errors)
+        _validate_bracket_placeholders(mission.pickup_objective, f'Missão "{mid}" (pickup_objective)', known_locations, known_items, errors)
+        _validate_bracket_placeholders(mission.delivery_prompt, f'Missão "{mid}" (delivery_prompt)', known_locations, known_items, errors)
+        _validate_bracket_placeholders(mission.wrong_item_message, f'Missão "{mid}" (wrong_item_message)', known_locations, known_items, errors)
+
+        _validate_cutscene_block(mission.cutscene_inicio, f'Missão "{mid}" ({mission.cutscene_inicio.name})', known_chars, known_items, known_locations, errors)
+        _validate_cutscene_block(mission.cutscene_fim, f'Missão "{mid}" ({mission.cutscene_fim.name})', known_chars, known_items, known_locations, errors)
 
     for eid, enc in pkg.encounters.items():
         if enc.npc not in known_chars:
@@ -104,7 +111,8 @@ def validate_story(pkg: StoryPackage, app_root: Path | None = None) -> list[str]
             errors.append(f'Encontro "{eid}": cor de telhado inválida "{enc.roof_color}". Use #rrggbb.')
         if enc.roof_logo and story_dir and not (story_dir / enc.roof_logo).is_file():
             errors.append(f'Encontro "{eid}": logo de telhado ausente "{enc.roof_logo}".')
-        _validate_cutscene_block(enc.cutscene, f'Encontro "{eid}"', known_chars, known_items, errors)
+        _validate_bracket_placeholders(enc.prompt, f'Encontro "{eid}" (prompt)', known_locations, known_items, errors)
+        _validate_cutscene_block(enc.cutscene, f'Encontro "{eid}"', known_chars, known_items, known_locations, errors)
 
     for code, loc in pkg.locations.items():
         if loc.roof_color and not is_building_code(code):
@@ -119,11 +127,32 @@ def validate_story(pkg: StoryPackage, app_root: Path | None = None) -> list[str]
     return errors
 
 
+def _validate_bracket_placeholders(
+    text: str,
+    ctx: str,
+    known_locations: set[str],
+    known_items: set[str],
+    errors: list[str],
+) -> None:
+    if not text:
+        return
+    lower_items = {iid.lower() for iid in known_items}
+    for match in BRACKET_TOKEN_RE.finditer(text):
+        token = match.group(1).strip()
+        if LOC_CODE_RE.match(token) and known_locations and token.upper() not in known_locations:
+            errors.append(f'{ctx}: marcador "[{token}]" referencia local inexistente.')
+        elif token.lower().startswith('item-'):
+            item_id = token[5:].strip().lower()
+            if item_id not in lower_items:
+                errors.append(f'{ctx}: marcador "[{token}]" referencia item não cadastrado.')
+
+
 def _validate_cutscene_block(
     block: CutsceneBlock,
     ctx: str,
     known_chars: set[str],
     known_items: set[str],
+    known_locations: set[str],
     errors: list[str],
 ) -> None:
     if block.left and block.left.lower() != 'none' and block.left not in known_chars:
@@ -135,3 +164,5 @@ def _validate_cutscene_block(
             errors.append(f'{ctx} (passo {idx}): ENTREGAR referencia item inexistente "{step.text}".')
         elif step.kind == 'link' and not URL_RE.match(step.target or ''):
             errors.append(f'{ctx} (passo {idx}): LINK com URL inválida "{step.target}". Use http:// ou https://.')
+        elif step.kind in ('line', 'choice'):
+            _validate_bracket_placeholders(step.text, f'{ctx} (passo {idx})', known_locations, known_items, errors)
