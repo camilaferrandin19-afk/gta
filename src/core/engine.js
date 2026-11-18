@@ -3,7 +3,7 @@ import { RoadPathfinder } from '../world/pathfinding.js';
 import { TrafficManager } from '../world/traffic-manager.js?v=24';
 import { BoatManager } from '../world/boat-manager.js?v=17';
 import { InputManager } from '../input/input-manager.js?v=20';
-import { WebGLRenderer } from '../render/webgl-renderer.js?v=30';
+import { WebGLRenderer } from '../render/webgl-renderer.js?v=31';
 import { isInWater, resolveCircleStaticObstacle, resolveEntityCollisions, resolveVehiclePairCollision } from '../physics/collision.js?v=11';
 import {
   applyPedestrianDamage,
@@ -778,13 +778,18 @@ export class Engine {
     this.objectiveCode = target.code;
     this.objectivePoint = { ...target.spawnPoint, doorSide: target.doorSide || null };
     this.objectiveLocationType = target.type || null;
+    const activeMission = this.storyPackage?.missions?.[this.currentMissionIndex];
+    const spriteTop = this.#getMissionNpcSpriteTop(activeMission);
     if ((target.type === 'commerce' || target.type === 'house') && target.bounds) {
       this.objectiveNpcPoint = {
         x: target.bounds.x + target.bounds.w * 0.5,
-        y: target.bounds.y + target.bounds.h * 0.55
+        y: target.bounds.y + target.bounds.h * 0.55,
+        location: target.code,
+        angle: Math.PI * 0.5,
+        spriteTop,
       };
     } else {
-      this.objectiveNpcPoint = target.spawnPoint;
+      this.objectiveNpcPoint = { ...target.spawnPoint, location: target.code, angle: Math.PI * 0.5, spriteTop };
     }
     this.routePoints = this.pathfinder.findRoute(this.player.x, this.player.y, this.objectiveCode);
   }
@@ -826,6 +831,7 @@ export class Engine {
           location: encounter.location,
           prompt: encounter.prompt,
           cutscene: encounter.cutscene,
+          spriteTop: this.storyPackage?.characters?.get(encounter.npc)?.sprites?.top || '',
           x: pos.x,
           y: pos.y,
           angle: pos.angle,
@@ -865,6 +871,18 @@ export class Engine {
     return protChar?.sprites || null;
   }
 
+  #getMissionNpcSpriteTop(mission) {
+    if (!mission || !(this.storyPackage?.characters instanceof Map)) return '';
+    const protId = this.storyPackage?.protagonist || '';
+    const cs = mission.outroCutscene || mission.introCutscene;
+    const candidateId = (cs?.rightChar && cs.rightChar !== protId)
+      ? cs.rightChar
+      : (cs?.leftChar && cs.leftChar !== protId)
+        ? cs.leftChar
+        : (cs?.rightChar || cs?.leftChar || '');
+    return (candidateId && this.storyPackage.characters.get(candidateId)?.sprites?.top) || '';
+  }
+
   #getMissionTargetNpcPoint() {
     const activeMission = this.storyPackage?.missions?.[this.currentMissionIndex];
     if (!activeMission?.targetLocation || !this.cityMap) return null;
@@ -877,7 +895,10 @@ export class Engine {
       if ((target.type === 'commerce' || target.type === 'house') && target.bounds) {
         pt = {
           x: target.bounds.x + target.bounds.w * 0.5,
-          y: target.bounds.y + target.bounds.h * 0.55
+          y: target.bounds.y + target.bounds.h * 0.55,
+          location: target.code,
+          angle: Math.PI * 0.5,
+          spriteTop: this.#getMissionNpcSpriteTop(activeMission),
         };
       }
     } catch {
@@ -957,7 +978,13 @@ export class Engine {
           (pt) => Math.hypot(pt.x - this.objectiveNpcPoint.x, pt.y - this.objectiveNpcPoint.y) < 4
         );
         if (!alreadySaved) {
-          this.completedNpcPoints.push({ x: this.objectiveNpcPoint.x, y: this.objectiveNpcPoint.y });
+          this.completedNpcPoints.push({
+            x: this.objectiveNpcPoint.x,
+            y: this.objectiveNpcPoint.y,
+            location: this.objectiveNpcPoint.location,
+            angle: this.objectiveNpcPoint.angle,
+            spriteTop: this.objectiveNpcPoint.spriteTop || '',
+          });
         }
       }
       this.setObjective(null);

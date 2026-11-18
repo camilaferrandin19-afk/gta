@@ -254,7 +254,7 @@ export class WebGLRenderer {
     }
   }
 
-  #drawStoryNpc(x, y, time, withHalo = false) {
+  #drawStoryNpc(x, y, time, withHalo = false, spriteTop = '', angle = Math.PI * 0.5, customQuads = null, isCovered = false) {
     if (withHalo) {
       const pulse = 1 + Math.sin(time * 5) * 0.14;
       const ringSize = 36 * pulse;
@@ -267,6 +267,30 @@ export class WebGLRenderer {
         'circle',
         [0.98, 0.78, 0.18, 0.75]
       );
+    }
+    const entry = spriteTop ? this.#getOrLoadLogoTexture(spriteTop) : null;
+    if (entry && entry.loaded && entry.texture && customQuads && !isCovered) {
+      const cos = Math.cos(angle);
+      const sin = Math.sin(angle);
+      const drawArm = (fwd, side) => {
+        const ax = x + (cos * fwd - sin * side);
+        const ay = y + (sin * fwd + cos * side);
+        this.#pushQuad(ax - 4, ay - 2.5, 8, 5, angle, 'solid', [0.92, 0.72, 0.52, 1]);
+      };
+      drawArm(2, -11);
+      drawArm(2, 11);
+      const aspect = entry.width / Math.max(1, entry.height);
+      const boxH = 56;
+      customQuads.push({
+        cx: x,
+        cy: y,
+        w: boxH * aspect,
+        h: boxH,
+        angle: angle - Math.PI * 0.5,
+        entry,
+        alpha: 1,
+      });
+      return;
     }
     // Braços e sombra no chão
     this.#pushQuad(x - 13, y - 2, 6, 7, 0, 'solid', [0.95, 0.78, 0.65, 1]);
@@ -807,13 +831,27 @@ export class WebGLRenderer {
       }
     }
 
+    const pendingCustomQuads = [];
+    const isCoveredByClosedRoof = (px, py) => closedRoofs.some(
+      (r) => (r.alpha ?? 1) > 0.5 && px >= r.x && px <= r.x + r.w && py >= r.y && py <= r.y + r.h
+    );
+
     // Personagens de missões já concluídas e NPCs fixos de encontros extras
     for (const pt of completedNpcPoints) {
       if (pt.x < minX || pt.x > maxX || pt.y < minY || pt.y > maxY) continue;
       const isPlayerInsideEncounter = Boolean(
         !player.inVehicleId && pt.location && player.insideLocationCode === pt.location,
       );
-      this.#drawStoryNpc(pt.x, pt.y, time, isPlayerInsideEncounter);
+      this.#drawStoryNpc(
+        pt.x,
+        pt.y,
+        time,
+        isPlayerInsideEncounter,
+        pt.spriteTop || '',
+        pt.angle ?? Math.PI * 0.5,
+        pendingCustomQuads,
+        isCoveredByClosedRoof(pt.x, pt.y)
+      );
       if (isPlayerInsideEncounter) {
         this.#drawNpcWaves(pt.x, pt.y, time);
       }
@@ -822,11 +860,19 @@ export class WebGLRenderer {
     // Boneco do personagem de destino (dentro do estabelecimento ou no ponto de encontro)
     const npcMarker = objectiveNpcPoint || objectivePoint;
     if (npcMarker) {
-      this.#drawStoryNpc(npcMarker.x, npcMarker.y, time, true);
+      this.#drawStoryNpc(
+        npcMarker.x,
+        npcMarker.y,
+        time,
+        true,
+        npcMarker.spriteTop || '',
+        npcMarker.angle ?? Math.PI * 0.5,
+        pendingCustomQuads,
+        isCoveredByClosedRoof(npcMarker.x, npcMarker.y)
+      );
     }
 
     // Telhados fechados cobrem pessoas dentro dos prédios quando o jogador está fora
-    const pendingCustomQuads = [];
     for (const roof of closedRoofs) {
       const ra = roof.alpha ?? 1;
       this.#pushQuad(roof.x, roof.y, roof.w, roof.h, 0, 'roof', roof.color);
