@@ -115,6 +115,7 @@ export class Engine {
       sinkScale: 1,
       sinkAlpha: 1,
       sinkProgress: 0,
+      knockdownTimer: 0,
       ejected: { active: false, vx: 0, vy: 0, hitCooldown: 0, graceTimer: 0, sourceVehicleId: null },
       sinking: { active: false, timer: 0, duration: 1.35, vehicleId: null, vx: 0, vy: 0 }
     };
@@ -653,6 +654,7 @@ export class Engine {
     this.player.sinkScale = 1;
     this.player.sinkAlpha = 1;
     this.player.sinkProgress = 0;
+    this.player.knockdownTimer = 0;
     this.player.ejected = { active: false, vx: 0, vy: 0, hitCooldown: 0, graceTimer: 0, sourceVehicleId: null };
     this.player.sinking = { active: false, timer: 0, duration: 1.35, vehicleId: null, vx: 0, vy: 0 };
 
@@ -726,8 +728,9 @@ export class Engine {
     this.lastVehicleChunkKey = current.key;
   }
 
-  applyDamage(amount, fatalReason = 'Você se deu mal!', { bypassResistance = false } = {}) {
+  applyDamage(amount, fatalReason = 'Você se deu mal!', { bypassResistance = false, bypassKnockdown = false } = {}) {
     if (this.player.isDead || amount <= 0) return;
+    if (!bypassKnockdown && (this.player.knockdownTimer || 0) > 0) return;
     const effectiveDamage = bypassResistance ? amount : Math.max(1, Math.round(amount * 0.55));
     this.player.health = Math.max(0, this.player.health - effectiveDamage);
     this.hud.triggerDamageFlash();
@@ -1384,6 +1387,10 @@ export class Engine {
           );
           this.applyDamage(Math.max(1, Math.round(ejRes.extraDamage * 0.75)), 'Você colidiu fortemente após ser ejetado!');
         }
+        if (!this.player.ejected.active && !this.player.isDead && !this.deathSequence) {
+          this.player.knockdownTimer = 2.0;
+          this.player.speed = 0;
+        }
         this.#resolvePlayerMissionNpcCollision();
       } else if (this.player.enteringVehicle) {
         const anim = this.player.enteringVehicle;
@@ -1445,6 +1452,11 @@ export class Engine {
           this.player.x = anim.toX;
           this.player.y = anim.toY;
         }
+      } else if ((this.player.knockdownTimer || 0) > 0) {
+        this.player.knockdownTimer = Math.max(0, this.player.knockdownTimer - dt);
+        this.player.speed = 0;
+        this.player.walkPhase = 0;
+        this.#resolvePlayerMissionNpcCollision();
       } else {
         updatePedestrian(this.player, input, dt, this.cityMap, this.vehicles);
         this.#resolvePlayerMissionNpcCollision();
@@ -1756,6 +1768,10 @@ export class Engine {
           alpha: 0.72,
         });
         this.applyDamage(dmg, 'Você foi atropelado por um veículo!');
+        if (!this.player.isDead && !this.deathSequence) {
+          this.player.knockdownTimer = 2.0;
+          this.player.speed = 0;
+        }
         break;
       }
     }

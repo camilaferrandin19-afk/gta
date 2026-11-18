@@ -884,7 +884,8 @@ export class WebGLRenderer {
         this.#pushQuad(lx - w * 0.5 * pScale, ly - h * 0.5 * pScale, w * pScale, h * pScale, player.angle + rotOffset, 'solid', [color[0], color[1], color[2], pAlpha]);
       };
 
-      const wantFallenFront = Boolean(player.isDead && !ridingMoto && playerSprites?.front);
+      const isFallen = Boolean((player.isDead || (player.knockdownTimer || 0) > 0) && !ridingMoto);
+      const wantFallenFront = Boolean(isFallen && playerSprites?.front);
       const customSpriteUrl = wantFallenFront ? playerSprites.front : (playerSprites?.top || '');
       const customSpriteEntry = customSpriteUrl ? this.#getOrLoadLogoTexture(customSpriteUrl) : null;
       const hasCustomSprite = Boolean(customSpriteEntry && customSpriteEntry.loaded && customSpriteEntry.texture);
@@ -893,7 +894,7 @@ export class WebGLRenderer {
         // Braços estendidos segurando o guidão
         drawLimb(8, -7, 9, 4, [0.92, 0.72, 0.52]);
         drawLimb(8, 7, 9, 4, [0.92, 0.72, 0.52]);
-      } else if (wantFallenFront && hasCustomSprite) {
+      } else if (isFallen) {
         // Braços e pernas padrão esparramados ao cair no chão
         drawLimb(-8.5, -4.5, 11, 5, [0.15, 0.22, 0.35], 0.2);
         drawLimb(-8.5, 4.5, 11, 5, [0.15, 0.22, 0.35], -0.2);
