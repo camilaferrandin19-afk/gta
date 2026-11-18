@@ -12,6 +12,8 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPlainTextEdit,
     QPushButton,
+    QScrollArea,
+    QTabWidget,
     QVBoxLayout,
     QWidget,
 )
@@ -38,7 +40,15 @@ class StoryMetadataTab(QWidget):
         self._pkg: StoryPackage | None = None
 
         root = QVBoxLayout(self)
-        root.setSpacing(12)
+        self.subtabs = QTabWidget()
+        root.addWidget(self.subtabs)
+
+        # Sub-aba 1: Identidade
+        identity_scroll = QScrollArea()
+        identity_scroll.setWidgetResizable(True)
+        identity_page = QWidget()
+        identity_layout = QVBoxLayout(identity_page)
+        identity_layout.setSpacing(12)
 
         info_group = QGroupBox('Identidade da História')
         form = QFormLayout(info_group)
@@ -76,17 +86,29 @@ class StoryMetadataTab(QWidget):
         form.addRow('Imagem de abertura:', self.splash_picker)
         form.addRow('Imagem de fim:', self.splash_end_picker)
 
-        root.addWidget(info_group)
+        identity_layout.addWidget(info_group)
+        identity_layout.addStretch(1)
+        identity_scroll.setWidget(identity_page)
+        self.subtabs.addTab(identity_scroll, 'Identidade')
+
+        # Sub-aba 2: Colecionáveis
         self.collectibles_editor: ExtraItemsGroupWidget | None = None
         if app_root is not None and pkg_provider is not None:
+            collectibles_scroll = QScrollArea()
+            collectibles_scroll.setWidgetResizable(True)
+            collectibles_page = QWidget()
+            collectibles_layout = QVBoxLayout(collectibles_page)
+            collectibles_layout.setSpacing(12)
             self.collectibles_editor = ExtraItemsGroupWidget(
                 'Colecionáveis Globais (story.md)',
                 app_root,
                 pkg_provider,
                 on_changed=on_data_changed,
             )
-            root.addWidget(self.collectibles_editor)
-        root.addStretch(1)
+            collectibles_layout.addWidget(self.collectibles_editor)
+            collectibles_layout.addStretch(1)
+            collectibles_scroll.setWidget(collectibles_page)
+            self.subtabs.addTab(collectibles_scroll, 'Colecionáveis')
 
         self.title_edit.textChanged.connect(self._sync)
         self.page_title_edit.textChanged.connect(self._sync)
