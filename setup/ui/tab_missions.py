@@ -202,6 +202,8 @@ class CutsceneEditorWidget(QGroupBox):
         self.table.setHorizontalHeaderLabels(['Tipo', 'Falante', 'Texto / Item', 'Destino / URL'])
         self.table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
         self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self.table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
+        self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.table.setMinimumHeight(140)
         layout.addWidget(self.table)
 
