@@ -5,6 +5,7 @@ import {
   parseMissionMarkdown,
   parseEncounterMarkdown,
   parseMapMarkdown,
+  parseMapRoofsMarkdown,
   replaceLocationCodesWithNames,
   validateAssetPath,
   StoryParseError,
@@ -308,11 +309,19 @@ export async function loadStoryPackage(basePath = './story', cityMap = null, opt
   }
 
   let locationNames = new Map();
+  const mapRoofs = new Map();
   const mapUrl = `${cleanBase}/map/map.md`;
   const mapPromise = (async () => {
     if (await cachedExists(mapUrl)) {
       const mapRaw = await readStoryText(mapUrl, 'map/map.md');
       locationNames = parseMapMarkdown(mapRaw, 'map/map.md');
+      const rawRoofs = parseMapRoofsMarkdown(mapRaw, 'map/map.md');
+      for (const [code, roof] of rawRoofs.entries()) {
+        mapRoofs.set(code, {
+          roofColor: roof.roofColor,
+          roofLogo: roof.roofLogo ? `${cleanBase}/${roof.roofLogo}` : '',
+        });
+      }
     }
   })();
 
@@ -554,6 +563,7 @@ export async function loadStoryPackage(basePath = './story', cityMap = null, opt
     missions,
     encounters,
     locationNames,
+    mapRoofs,
   };
 }
 
@@ -587,6 +597,11 @@ export function collectStoryAssetUrls(storyPackage) {
           if (bgUrl) urls.add(bgUrl);
         }
       }
+    }
+  }
+  if (storyPackage.mapRoofs instanceof Map) {
+    for (const roof of storyPackage.mapRoofs.values()) {
+      if (roof?.roofLogo) urls.add(roof.roofLogo);
     }
   }
   for (const encounter of storyPackage.encounters || []) {

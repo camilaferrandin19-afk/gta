@@ -11,6 +11,7 @@ import {
   parseMissionMarkdown,
   parseEncounterMarkdown,
   parseMapMarkdown,
+  parseMapRoofsMarkdown,
   replaceLocationCodesWithNames,
   validateAssetPath,
   parseStoryCatalog,
@@ -569,6 +570,33 @@ test('parseStoryCatalog valida stories.json real, entrada direta para 1 históri
   assert.throws(() => parseStoryCatalog('{"stories":[]}', 'stories.json'), StoryParseError);
   assert.throws(
     () => parseStoryCatalog(JSON.stringify({ stories: [{ id: '../hack', title: 'X' }] }), 'stories.json'),
+    StoryParseError,
+  );
+});
+
+test('parseMapMarkdown e parseMapRoofsMarkdown leem roof_color e roof_logo opcionais por edificação', () => {
+  const sample = [
+    'RUA-01: Av. Central',
+    'CASA-10: Casa Azul | roof_color=#2563eb | roof_logo=assets/hostnet.svg',
+    'COM-02: Loja Verde | roof_color=#16a34a',
+  ].join('\n');
+
+  const names = parseMapMarkdown(sample, 'map/map.md');
+  assert.equal(names.get('RUA-01'), 'Av. Central');
+  assert.equal(names.get('CASA-10'), 'Casa Azul');
+  assert.equal(names.get('COM-02'), 'Loja Verde');
+
+  const roofs = parseMapRoofsMarkdown(sample, 'map/map.md');
+  assert.deepEqual(roofs.get('CASA-10'), { roofColor: '#2563eb', roofLogo: 'assets/hostnet.svg' });
+  assert.deepEqual(roofs.get('COM-02'), { roofColor: '#16a34a', roofLogo: '' });
+  assert.equal(roofs.has('RUA-01'), false);
+
+  assert.throws(
+    () => parseMapRoofsMarkdown('RUA-01: Av. Central | roof_color=#2563eb', 'map/map.md'),
+    StoryParseError,
+  );
+  assert.throws(
+    () => parseMapRoofsMarkdown('CASA-10: Casa | roof_color=azul', 'map/map.md'),
     StoryParseError,
   );
 });
