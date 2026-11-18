@@ -680,6 +680,14 @@ export class CityMap {
     if (loc.type === 'plaza') {
       return { x: loc.spawnPoint.x, y: loc.spawnPoint.y, kind: 'plaza', code: loc.code };
     }
+    if (loc.type === 'road') {
+      return {
+        x: loc.bounds.x + loc.bounds.w * 0.5,
+        y: loc.bounds.y + loc.bounds.h * 0.5,
+        kind: 'road',
+        code: loc.code
+      };
+    }
     return { x: loc.spawnPoint.x, y: loc.spawnPoint.y, kind: loc.type, code: loc.code };
   }
 

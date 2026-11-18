@@ -242,3 +242,18 @@ test('resolveIndoorOppositePosition posiciona NPC na parede oposta à porta da C
   assert.equal(pos.angle, Math.PI * 0.5);
   assert.throws(() => map.resolveIndoorOppositePosition('RUA-004'));
 });
+
+test('resolveItemLocation posiciona item em rua isolada exatamente no centro horizontal e vertical da via', () => {
+  const map = new CityMap();
+  const hRoad = map.resolveLocationCode('RUA-001');
+  const hPt = map.resolveItemLocation('RUA-001');
+  assert.equal(hPt.kind, 'road');
+  assert.equal(hPt.x, hRoad.bounds.x + hRoad.bounds.w * 0.5);
+  assert.equal(hPt.y, hRoad.bounds.y + hRoad.bounds.h * 0.5);
+
+  const vRoad = map.resolveLocationCode('RUA-035');
+  const vPt = map.resolveItemLocation('RUA-035');
+  assert.equal(vPt.kind, 'road');
+  assert.equal(vPt.x, vRoad.bounds.x + vRoad.bounds.w * 0.5);
+  assert.equal(vPt.y, vRoad.bounds.y + vRoad.bounds.h * 0.5);
+});
