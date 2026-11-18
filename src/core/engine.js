@@ -572,10 +572,10 @@ export class Engine {
     this.hud?.setInventoryCount?.(this.inventory.getCount(), this.inventory.capacity);
   }
 
-  #grantMissionItem(itemId) {
+  #grantMissionItem(itemId, overrides = {}) {
     const itemDef = this.storyPackage?.items?.get(itemId);
     if (!itemDef) return;
-    const res = this.inventory.addItem(itemDef);
+    const res = this.inventory.addItem({ ...itemDef, ...overrides });
     if (!res.ok && res.reason === 'inventory_full') {
       console.warn(`[Engine] Inventário cheio (${this.inventory.capacity}/${this.inventory.capacity}); não foi possível adicionar "${itemDef.name}".`);
       if (typeof window !== 'undefined' && typeof window.alert === 'function') {
@@ -623,27 +623,26 @@ export class Engine {
     this.collectibleFullToastCooldown = 0;
     this.worldCollectibles = [];
     this.collectedExtraIds = new Set();
-    if (this.storyPackage?.items instanceof Map) {
-      for (const item of this.storyPackage.items.values()) {
-        if (item.category === 'extra' && item.worldPoint) {
-          const alreadyCollected = this.collectedExtraIds.has(item.id) || this.inventory.hasItem(item.id);
-          if (alreadyCollected) {
-            this.collectedExtraIds.add(item.id);
-            continue;
-          }
-          this.worldCollectibles.push({
-            id: item.id,
-            name: item.name,
-            description: item.description,
-            imageUrl: item.imageUrl,
-            x: item.worldPoint.x,
-            y: item.worldPoint.y,
-            kind: item.worldPoint.kind,
-            locationCode: item.worldPoint.code,
-            rarity: item.rarity || 'normal',
-            collected: false
-          });
+    if (Array.isArray(this.storyPackage?.extraItems)) {
+      for (const item of this.storyPackage.extraItems) {
+        if (!item?.worldPoint) continue;
+        const alreadyCollected = this.collectedExtraIds.has(item.id) || this.inventory.hasItem(item.id);
+        if (alreadyCollected) {
+          this.collectedExtraIds.add(item.id);
+          continue;
         }
+        this.worldCollectibles.push({
+          id: item.id,
+          name: item.name,
+          description: item.description,
+          imageUrl: item.imageUrl,
+          x: item.worldPoint.x,
+          y: item.worldPoint.y,
+          kind: item.worldPoint.kind,
+          locationCode: item.worldPoint.code,
+          rarity: item.rarity || 'normal',
+          collected: false
+        });
       }
     }
     this.player.burnCooldown = 0;
@@ -1894,7 +1893,7 @@ export class Engine {
         }
         c.collected = true;
         this.collectedExtraIds.add(c.id);
-        this.#grantMissionItem(c.id);
+        this.#grantMissionItem(c.id, { category: 'extra', rarity: c.rarity || 'normal' });
         const screenPos = this.#worldToScreen(c.x, c.y);
         this.hud.animatePickupToInventory(screenPos.x, screenPos.y, c.imageUrl, c.name);
         this.hud.showToast(`${c.name} — ${c.description}`, {

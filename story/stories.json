@@ -6,13 +6,6 @@
       "description": "Cruzando a cidade para descobrir o segredo guardado em uma caixa secreta e lidando com GPUs, servidores e robôs!",
       "cover": "./story/vibe-coding/splash/splash-start.png",
       "path": "./story/vibe-coding"
-    },
-    {
-      "id": "tete",
-      "title": "Tete",
-      "description": "Subtítulo curto explicando o objetivo da história.",
-      "cover": "./story/tete/splash/splash-start.png",
-      "path": "./story/tete"
     }
   ]
 }

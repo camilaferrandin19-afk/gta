@@ -73,6 +73,45 @@ function parseListField(rawValue) {
     .filter(Boolean);
 }
 
+const VALID_RARITIES = new Set(['normal', 'especial', 'lendario']);
+
+function normalizeRarity(rawRarity, fileName, lineNum = 2) {
+  const clean = String(rawRarity || 'normal').trim().toLowerCase();
+  if (!VALID_RARITIES.has(clean)) {
+    throw new StoryParseError(
+      fileName,
+      lineNum,
+      `Raridade inválida "${rawRarity}". Use "normal", "especial" ou "lendario".`,
+    );
+  }
+  return clean;
+}
+
+function parseStoryCollectiblesField(rawValue, fileName = 'story.md') {
+  const entries = parseListField(rawValue);
+  return entries.map((entry) => {
+    const match = entry.match(/^([^\s@]+)\s*@\s*(.+?)(?:\s*\(([^)]+)\))?\s*$/);
+    if (!match) {
+      throw new StoryParseError(
+        fileName,
+        2,
+        `Colecionável malformado em story.md: "${entry}". Use "item-id @ LOCAL (raridade)".`,
+      );
+    }
+    const itemId = match[1].trim();
+    const location = match[2].trim();
+    const rarity = normalizeRarity(match[3] || 'normal', fileName, 2);
+    if (!itemId || !location) {
+      throw new StoryParseError(
+        fileName,
+        2,
+        `Colecionável incompleto em story.md: "${entry}". Informe item-id e LOCAL.`,
+      );
+    }
+    return { itemId, location, rarity };
+  });
+}
+
 export function parseStoryManifest(rawText, fileName = 'story.md') {
   const { meta, body } = parseFrontmatter(rawText, fileName);
 
@@ -91,7 +130,7 @@ export function parseStoryManifest(rawText, fileName = 'story.md') {
   }
 
   const items = parseListField(meta.items);
-  const collectibles = parseListField(meta.collectibles);
+  const collectibles = parseStoryCollectiblesField(meta.collectibles, fileName);
   const encounters = parseListField(meta.encounters);
 
   return {
@@ -115,23 +154,11 @@ export function parseItemMarkdown(rawText, fileName = 'item.md') {
     throw new StoryParseError(fileName, 2, 'Item deve definir "id" e "name" no frontmatter.');
   }
 
-  const rawCategory = String(meta.category || 'missao').trim().toLowerCase();
-  if (rawCategory !== 'missao' && rawCategory !== 'extra') {
-    throw new StoryParseError(fileName, 2, `Categoria inválida para item "${meta.id}": "${meta.category}". Use "missao" ou "extra".`);
-  }
-  const rawRarity = String(meta.rarity || '').trim().toLowerCase();
-  if (rawRarity && rawRarity !== 'normal' && rawRarity !== 'especial' && rawRarity !== 'lendario') {
-    throw new StoryParseError(fileName, 2, `Raridade inválida para item "${meta.id}": "${meta.rarity}". Use "normal", "especial" ou "lendario".`);
-  }
-
   return {
     id: meta.id,
     name: meta.name,
     description: meta.description || body || '',
     image: validateAssetPath(meta.image || '', fileName, 2),
-    location: String(meta.location || '').trim(),
-    category: rawCategory,
-    rarity: rawRarity || (rawCategory === 'extra' ? 'normal' : ''),
   };
 }
 
@@ -346,6 +373,39 @@ function splitMarkdownSections(body, bodyStartLine, allowedNames) {
   return { sections, sectionStarts };
 }
 
+function parseMissionItemsBlock(lines, startLine, fileName, cityMap = null) {
+  const entries = [];
+  for (let idx = 0; idx < lines.length; idx += 1) {
+    const lineNum = startLine + idx;
+    const trimmed = lines[idx].trim();
+    if (!trimmed) continue;
+    const clean = trimmed.startsWith('- ') ? trimmed.slice(2).trim() : trimmed;
+    const parts = clean.split('|').map((p) => p.trim());
+    if (parts.length < 2 || parts.length > 3 || !parts[0] || !parts[1]) {
+      throw new StoryParseError(
+        fileName,
+        lineNum,
+        `Item extra malformado em ## ITENS: "${trimmed}". Use "- item-id | LOCAL | raridade".`,
+      );
+    }
+    const [itemId, location, rawRarity = 'normal'] = parts;
+    const rarity = normalizeRarity(rawRarity, fileName, lineNum);
+    if (cityMap?.resolveItemLocation) {
+      try {
+        cityMap.resolveItemLocation(location);
+      } catch (err) {
+        throw new StoryParseError(
+          fileName,
+          lineNum,
+          `Local inválido para item "${itemId}" ("${location}"): ${err.message}`,
+        );
+      }
+    }
+    entries.push({ itemId, location, rarity, lineNum });
+  }
+  return entries;
+}
+
 export function parseMissionMarkdown(rawText, fileName = 'mission.md', cityMap = null) {
   const { meta, body, bodyStartLine } = parseFrontmatter(rawText, fileName);
 
@@ -380,6 +440,7 @@ export function parseMissionMarkdown(rawText, fileName = 'mission.md', cityMap =
   const { sections, sectionStarts } = splitMarkdownSections(body, bodyStartLine, [
     'CUTSCENE_INICIO',
     'CUTSCENE_FIM',
+    'ITENS',
   ]);
 
   return {
@@ -394,6 +455,7 @@ export function parseMissionMarkdown(rawText, fileName = 'mission.md', cityMap =
     requireItem: String(meta.require_item || '').trim(),
     deliveryPrompt: String(meta.delivery_prompt || '').trim(),
     wrongItemMessage: String(meta.wrong_item_message || '').trim(),
+    extraItems: parseMissionItemsBlock(sections.ITENS, sectionStarts.ITENS, fileName, cityMap),
     introCutscene: parseCutsceneBlock(sections.CUTSCENE_INICIO, sectionStarts.CUTSCENE_INICIO, fileName),
     outroCutscene: parseCutsceneBlock(sections.CUTSCENE_FIM, sectionStarts.CUTSCENE_FIM, fileName),
   };

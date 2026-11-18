@@ -379,7 +379,12 @@ export async function loadStoryPackage(basePath = './story', cityMap = null, opt
   );
 
   const items = new Map();
-  const itemIds = [...new Set([...(manifest.items || []), ...(manifest.collectibles || [])])];
+  const itemIds = [
+    ...new Set([
+      ...(manifest.items || []),
+      ...(manifest.collectibles || []).map((c) => c.itemId),
+    ]),
+  ];
   const totalItems = Math.max(1, itemIds.length);
   let loadedItems = 0;
   const itemsPromise = Promise.all(
@@ -387,10 +392,6 @@ export async function loadStoryPackage(basePath = './story', cityMap = null, opt
       const itemFile = `items/${itemId}.md`;
       const raw = await readStoryText(`${cleanBase}/${itemFile}`, itemFile);
       const item = parseItemMarkdown(raw, itemFile);
-      let worldPoint = null;
-      if (item.location && cityMap?.resolveItemLocation) {
-        worldPoint = cityMap.resolveItemLocation(item.location);
-      }
       let imageUrl = '';
       if (item.image) {
         const fullUrl = `${cleanBase}/${item.image}`;
@@ -403,7 +404,6 @@ export async function loadStoryPackage(basePath = './story', cityMap = null, opt
       items.set(item.id, {
         ...item,
         imageUrl,
-        worldPoint,
       });
       loadedItems += 1;
       reportProgress(0.45 + (loadedItems / totalItems) * 0.15, `Carregando itens (${loadedItems}/${totalItems})...`);
@@ -496,6 +496,15 @@ export async function loadStoryPackage(basePath = './story', cityMap = null, opt
       if (mission.requireItem && !items.has(mission.requireItem)) {
         throw new StoryParseError(missionFile, 2, `Item "${mission.requireItem}" (require_item) não declarado em story.md.`);
       }
+      for (const extra of mission.extraItems || []) {
+        if (!items.has(extra.itemId)) {
+          throw new StoryParseError(
+            missionFile,
+            extra.lineNum || 2,
+            `Item "${extra.itemId}" em ## ITENS não declarado em story.md.`,
+          );
+        }
+      }
 
       const cutsceneConfigs = [
         { cutscene: mission.introCutscene, fallbackCode: mission.startLocation },
@@ -550,8 +559,70 @@ export async function loadStoryPackage(basePath = './story', cityMap = null, opt
     }),
   );
 
+  const placedLocationsByItem = new Map();
+  const registerPlacement = (itemId, location, sourceFile, lineNum = 2) => {
+    const normalizedLoc = String(location || '').trim().toUpperCase();
+    const prev = placedLocationsByItem.get(itemId);
+    if (prev) {
+      throw new StoryParseError(
+        sourceFile,
+        lineNum,
+        `Item "${itemId}" posicionado em mais de um local ("${prev.location}" em ${prev.sourceFile} e "${location}" em ${sourceFile}).`,
+      );
+    }
+    placedLocationsByItem.set(itemId, { location: normalizedLoc, sourceFile });
+  };
+
+  for (const mission of missions) {
+    const missionFile = `missions/${mission.id}.md`;
+    if (mission.pickupLocation && mission.giveItem) {
+      registerPlacement(mission.giveItem, mission.pickupLocation, missionFile, 2);
+    }
+  }
+
+  const extraItems = [];
+  const pushExtraPlacement = (entry, sourceFile) => {
+    const itemDef = items.get(entry.itemId);
+    if (!itemDef) {
+      throw new StoryParseError(sourceFile, entry.lineNum || 2, `Item "${entry.itemId}" não declarado em story.md.`);
+    }
+    registerPlacement(entry.itemId, entry.location, sourceFile, entry.lineNum || 2);
+    let worldPoint = null;
+    if (cityMap?.resolveItemLocation) {
+      try {
+        worldPoint = cityMap.resolveItemLocation(entry.location);
+      } catch (err) {
+        throw new StoryParseError(
+          sourceFile,
+          entry.lineNum || 2,
+          `Local inválido para item "${entry.itemId}" ("${entry.location}"): ${err.message}`,
+        );
+      }
+    }
+    extraItems.push({
+      id: itemDef.id,
+      name: itemDef.name,
+      description: itemDef.description,
+      imageUrl: itemDef.imageUrl,
+      location: entry.location,
+      rarity: entry.rarity || 'normal',
+      worldPoint,
+      source: sourceFile,
+    });
+  };
+
+  for (const entry of manifest.collectibles || []) {
+    pushExtraPlacement(entry, 'story.md');
+  }
+  for (const mission of missions) {
+    const missionFile = `missions/${mission.id}.md`;
+    for (const entry of mission.extraItems || []) {
+      pushExtraPlacement(entry, missionFile);
+    }
+  }
+
   console.info(
-    `[StoryLoader] História "${manifest.title}" carregada (${characters.size} personagens, ${items.size} itens, ${missions.length} missões, ${encounters.length} encontros extras, ${locationNames.size} locais nomeados).`,
+    `[StoryLoader] História "${manifest.title}" carregada (${characters.size} personagens, ${items.size} itens, ${extraItems.length} extras no mapa, ${missions.length} missões, ${encounters.length} encontros extras, ${locationNames.size} locais nomeados).`,
   );
 
   return {
@@ -564,6 +635,7 @@ export async function loadStoryPackage(basePath = './story', cityMap = null, opt
     wrongItemLines,
     characters,
     items,
+    extraItems,
     missions,
     encounters,
     locationNames,
@@ -623,11 +695,11 @@ export function collectStoryAssetUrls(storyPackage) {
 }
 
 export function collectExtraItemAssetUrls(storyPackage) {
-  if (!storyPackage || !(storyPackage.items instanceof Map)) return [];
+  if (!storyPackage || !Array.isArray(storyPackage.extraItems)) return [];
   const urls = new Set();
-  for (const item of storyPackage.items.values()) {
-    if (item?.category === 'extra' && item?.imageUrl) {
-      urls.add(item.imageUrl);
+  for (const extra of storyPackage.extraItems) {
+    if (extra?.imageUrl) {
+      urls.add(extra.imageUrl);
     }
   }
   return [...urls];

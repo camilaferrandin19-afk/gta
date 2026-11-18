@@ -5,7 +5,7 @@ subtitle: Subtítulo curto explicando o objetivo da história.
 splash: splash/splash-start.png
 characters: personagem-01, personagem-02, personagem-03
 items: item-chave, item-bateria, item-cabo-rede, item-caderno, item-caixa-secreta, item-caneca-cafe, item-chave-oficina, item-cooler-rgb, item-cracha, item-disquete, item-maleta, item-manual, item-oculos, item-peca-robo, item-pendrive, item-pente-memoria, item-placa-video, item-servidor
-collectibles: item-extra
+collectibles: item-extra @ PRACA-002 (normal)
 missions: 01-exemplo
 encounters: extra-exemplo
 ---

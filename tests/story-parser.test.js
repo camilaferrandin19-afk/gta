@@ -75,17 +75,23 @@ test('carrega e valida o pacote de história de exemplo completo contra a cidade
 
   assert.equal(manifest.missions.length, 5);
   assert.equal(manifest.collectibles.length, 12);
+  const disqueteCollectible = manifest.collectibles.find((c) => c.itemId === 'disquete');
+  assert.ok(disqueteCollectible);
+  assert.equal(disqueteCollectible.location, 'PRACA-003');
+  assert.equal(disqueteCollectible.rarity, 'especial');
   const disqueteItem = parseItemMarkdown(
     fs.readFileSync(path.join(storyDir, 'items', 'disquete.md'), 'utf8'),
     'items/disquete.md'
   );
-  assert.equal(disqueteItem.category, 'extra');
-  assert.equal(disqueteItem.rarity, 'especial');
+  assert.equal(disqueteItem.id, 'disquete');
+  assert.equal(disqueteItem.location, undefined);
+  assert.equal(disqueteItem.category, undefined);
   const caixaItem = parseItemMarkdown(
     fs.readFileSync(path.join(storyDir, 'items', 'caixa-secreta.md'), 'utf8'),
     'items/caixa-secreta.md'
   );
-  assert.equal(caixaItem.category, 'missao');
+  assert.equal(caixaItem.id, 'caixa-secreta');
+  assert.equal(caixaItem.location, undefined);
   const m5 = parseMissionMarkdown(
     fs.readFileSync(path.join(storyDir, 'missions', '05-chave-do-vibe-coding.md'), 'utf8'),
     'missions/05-chave-do-vibe-coding.md',
@@ -359,10 +365,14 @@ test('pré-carrega itens extras na abertura quando includeExtras está ativo', a
     splashUrl: './story/splash.png',
     characters: new Map(),
     items: new Map([
-      ['caixa', { id: 'caixa', category: 'missao', imageUrl: './story/items/caixa.png' }],
-      ['disquete', { id: 'disquete', category: 'extra', imageUrl: './story/items/disquete.png' }],
-      ['caneca', { id: 'caneca', category: 'extra', imageUrl: './story/items/caneca.png' }],
+      ['caixa', { id: 'caixa', imageUrl: './story/items/caixa.png' }],
+      ['disquete', { id: 'disquete', imageUrl: './story/items/disquete.png' }],
+      ['caneca', { id: 'caneca', imageUrl: './story/items/caneca.png' }],
     ]),
+    extraItems: [
+      { id: 'disquete', location: 'PRACA-003', rarity: 'especial', imageUrl: './story/items/disquete.png' },
+      { id: 'caneca', location: 'CASA-001', rarity: 'normal', imageUrl: './story/items/caneca.png' },
+    ],
     missions: [
       { id: 'm1', giveItem: 'caixa', requireItem: null, introCutscene: null, outroCutscene: null },
     ],
@@ -636,4 +646,103 @@ test('replaceStoryPlaceholders substitui locais, itens e personagens entre colch
     { text: ' e ', bold: false, italic: false, underline: false },
     { text: 'Destaque', bold: true, italic: false, underline: true },
   ]);
+});
+
+test('parseMissionMarkdown lê seção ## ITENS com item-id, location e rarity', () => {
+  const cityMap = new CityMap();
+  const mission = parseMissionMarkdown(
+    `---
+id: 01-teste
+title: Missão Teste
+start: CASA-001
+target: COM-001
+---
+
+## CUTSCENE_INICIO
+left: p1
+right: p2
+bg: CASA-001
+- P1: Olá!
+
+## CUTSCENE_FIM
+left: p1
+right: p2
+bg: COM-001
+- P2: Obrigado!
+
+## ITENS
+- item-extra | PRACA-002 | especial
+- outro-item | RUA-004 x RUA-036 NE
+`,
+    'missions/01-teste.md',
+    cityMap,
+  );
+  assert.equal(mission.extraItems.length, 2);
+  assert.deepEqual(mission.extraItems[0], {
+    itemId: 'item-extra',
+    location: 'PRACA-002',
+    rarity: 'especial',
+    lineNum: 20,
+  });
+  assert.deepEqual(mission.extraItems[1], {
+    itemId: 'outro-item',
+    location: 'RUA-004 x RUA-036 NE',
+    rarity: 'normal',
+    lineNum: 21,
+  });
+});
+
+test('loadStoryPackage rejeita o mesmo item posicionado em dois locais diferentes', async () => {
+  const { loadStoryPackage } = await import('../src/story/story-loader.js');
+  const cityMap = new CityMap();
+  const files = {
+    './story/dup/story.md': `---
+title: Duplicado
+splash: splash/s.png
+characters: p1
+items: item-a
+collectibles: item-a @ PRACA-002 (normal)
+missions: 01-m
+---
+`,
+    './story/dup/characters/p1.md': '---\nid: p1\nname: P1\nsprite_top: assets/p1.svg\n---\n',
+    './story/dup/items/item-a.md': '---\nid: item-a\nname: Item A\ndescription: Desc\nimage: assets/a.svg\n---\n',
+    './story/dup/missions/01-m.md': `---
+id: 01-m
+title: M1
+start: CASA-001
+target: COM-001
+---
+## CUTSCENE_INICIO
+left: p1
+right: -
+bg: CASA-001
+- P1: Oi
+
+## CUTSCENE_FIM
+left: p1
+right: -
+bg: COM-001
+- P1: Fim
+
+## ITENS
+- item-a | CASA-001 | normal
+`,
+  };
+  const origFetch = globalThis.fetch;
+  globalThis.fetch = async (url) => {
+    const cleanUrl = String(url).split('?')[0];
+    if (cleanUrl in files) {
+      return { ok: true, status: 200, text: async () => files[cleanUrl] };
+    }
+    return { ok: false, status: 404, text: async () => '' };
+  };
+  try {
+    await assert.rejects(
+      () => loadStoryPackage('./story/dup', cityMap, { forceReload: true }),
+      (err) => err?.name === 'StoryParseError' && /mais de um local/i.test(err.message),
+    );
+  } finally {
+    globalThis.fetch = origFetch;
+  }
 });
