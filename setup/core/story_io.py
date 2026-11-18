@@ -85,7 +85,7 @@ def load_catalog(app_root: Path) -> list[StoryCatalogEntry]:
     entries: list[StoryCatalogEntry] = []
     for item in data.get('stories', []):
         story_id = str(item.get('id', '')).strip()
-        if not story_id:
+        if not story_id or story_id == '_template':
             continue
         entries.append(StoryCatalogEntry(
             id=story_id,
@@ -244,11 +244,25 @@ def save_story_package(app_root: Path, pkg: StoryPackage) -> None:
 
 def create_story(app_root: Path, story_id: str, title: str, description: str = '') -> StoryPackage:
     clean_id = (story_id or '').strip().lower()
-    if not STORY_ID_RE.match(clean_id):
+    if clean_id == '_template' or not STORY_ID_RE.match(clean_id):
         raise StoryIOError('Identificador inválido. Use apenas letras minúsculas, números e hífen.')
     story_dir = app_root / 'story' / clean_id
     if story_dir.exists():
         raise StoryIOError(f'Já existe uma história com o identificador "{clean_id}".')
+
+    template_dir = app_root / 'story' / '_template'
+    if template_dir.is_dir():
+        shutil.copytree(template_dir, story_dir)
+        pkg = load_story_package(app_root, clean_id)
+        clean_title = title.strip() or clean_id
+        clean_desc = description.strip() or pkg.body_description
+        pkg.title = clean_title
+        pkg.page_title = clean_title
+        pkg.subtitle = description.strip() or pkg.subtitle
+        pkg.body_title = clean_title
+        pkg.body_description = clean_desc
+        save_story_package(app_root, pkg)
+        return pkg
 
     for sub in ('assets', 'characters', 'items', 'map', 'missions', 'splash'):
         (story_dir / sub).mkdir(parents=True, exist_ok=True)

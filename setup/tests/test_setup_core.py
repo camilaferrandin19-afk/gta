@@ -31,6 +31,7 @@ class SetupCoreTests(unittest.TestCase):
         self.app_copy = self.tmp_dir / 'app'
         (self.app_copy / 'story').mkdir(parents=True)
         shutil.copytree(APP_ROOT / 'story' / 'vibe-coding', self.app_copy / 'story' / 'vibe-coding')
+        shutil.copytree(APP_ROOT / 'story' / '_template', self.app_copy / 'story' / '_template')
         shutil.copy2(APP_ROOT / 'story' / 'stories.json', self.app_copy / 'story' / 'stories.json')
 
     def tearDown(self) -> None:
@@ -52,8 +53,15 @@ class SetupCoreTests(unittest.TestCase):
         self.assertEqual(errors, [])
 
     def test_create_save_and_delete_story_updates_catalog(self) -> None:
+        template_pkg = load_story_package(self.app_copy, '_template')
+        self.assertEqual(validate_story(template_pkg, self.app_copy), [])
+
         pkg = create_story(self.app_copy, 'aventura-teste', 'Aventura de Teste', 'Descrição teste')
         self.assertEqual(pkg.id, 'aventura-teste')
+        self.assertIn('01-exemplo', pkg.missions)
+        self.assertIn('extra-exemplo', pkg.encounters)
+        self.assertIn('item-chave', pkg.items)
+        self.assertIn('item-extra', pkg.items)
         self.assertEqual(validate_story(pkg, self.app_copy), [])
 
         catalog = load_catalog(self.app_copy)
