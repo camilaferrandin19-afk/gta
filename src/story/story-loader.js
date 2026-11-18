@@ -7,6 +7,7 @@ import {
   parseMapMarkdown,
   parseMapRoofsMarkdown,
   replaceLocationCodesWithNames,
+  replaceStoryPlaceholders,
   validateAssetPath,
   StoryParseError,
   parseStoryCatalog,
@@ -469,13 +470,13 @@ export async function loadStoryPackage(basePath = './story', cityMap = null, opt
       getCutsceneBackgroundCandidates(cleanBase, cutscene.background, fallbackCode),
       cachedExists,
     ));
-    cutscene.background = replaceLocationCodesWithNames(cutscene.background, locationNames);
+    cutscene.background = replaceLocationCodesWithNames(cutscene.background, locationNames, { items, characters });
     for (const step of cutscene.steps) {
-      step.text = replaceLocationCodesWithNames(step.text, locationNames);
+      step.text = replaceStoryPlaceholders(step.text, { locationNames, items, characters });
       if (step.choices) {
         for (const choice of step.choices) {
-          choice.label = replaceLocationCodesWithNames(choice.label, locationNames);
-          choice.reason = replaceLocationCodesWithNames(choice.reason, locationNames);
+          choice.label = replaceStoryPlaceholders(choice.label, { locationNames, items, characters });
+          choice.reason = replaceStoryPlaceholders(choice.reason, { locationNames, items, characters });
         }
       }
     }
@@ -507,15 +508,15 @@ export async function loadStoryPackage(basePath = './story', cityMap = null, opt
         ),
       );
 
-      mission.objective = replaceLocationCodesWithNames(mission.objective, locationNames);
+      mission.objective = replaceStoryPlaceholders(mission.objective, { locationNames, items, characters });
       if (mission.pickupObjective) {
-        mission.pickupObjective = replaceLocationCodesWithNames(mission.pickupObjective, locationNames);
+        mission.pickupObjective = replaceStoryPlaceholders(mission.pickupObjective, { locationNames, items, characters });
       }
       if (mission.deliveryPrompt) {
-        mission.deliveryPrompt = replaceLocationCodesWithNames(mission.deliveryPrompt, locationNames);
+        mission.deliveryPrompt = replaceStoryPlaceholders(mission.deliveryPrompt, { locationNames, items, characters });
       }
       if (mission.wrongItemMessage) {
-        mission.wrongItemMessage = replaceLocationCodesWithNames(mission.wrongItemMessage, locationNames);
+        mission.wrongItemMessage = replaceStoryPlaceholders(mission.wrongItemMessage, { locationNames, items, characters });
       }
       loadedMissions += 1;
       reportProgress(
@@ -540,7 +541,7 @@ export async function loadStoryPackage(basePath = './story', cityMap = null, opt
       }
       await hydrateCutscene(encounter.cutscene, encounter.location, encounterFile);
       if (encounter.prompt) {
-        encounter.prompt = replaceLocationCodesWithNames(encounter.prompt, locationNames);
+        encounter.prompt = replaceStoryPlaceholders(encounter.prompt, { locationNames, items, characters });
       }
       if (encounter.roofLogo) {
         encounter.roofLogo = withBust(`${cleanBase}/${encounter.roofLogo}`);
@@ -554,9 +555,9 @@ export async function loadStoryPackage(basePath = './story', cityMap = null, opt
   );
 
   return {
-    title: replaceLocationCodesWithNames(manifest.title, locationNames),
-    pageTitle: replaceLocationCodesWithNames(manifest.pageTitle || manifest.title, locationNames),
-    subtitle: replaceLocationCodesWithNames(manifest.subtitle, locationNames),
+    title: replaceStoryPlaceholders(manifest.title, { locationNames, items, characters }),
+    pageTitle: replaceStoryPlaceholders(manifest.pageTitle || manifest.title, { locationNames, items, characters }),
+    subtitle: replaceStoryPlaceholders(manifest.subtitle, { locationNames, items, characters }),
     splashUrl: withBust(splashUrl),
     faviconUrl: withBust(faviconUrl),
     npcLines,

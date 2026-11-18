@@ -13,10 +13,12 @@ import {
   parseMapMarkdown,
   parseMapRoofsMarkdown,
   replaceLocationCodesWithNames,
+  replaceStoryPlaceholders,
   validateAssetPath,
   parseStoryCatalog,
   StoryParseError
 } from '../src/story/story-parser.js';
+import { parseRichTextTokens } from '../src/ui/rich-text.js';
 import {
   collectMissionAssetUrls,
   collectStoryAssetUrls,
@@ -171,10 +173,10 @@ test('map/map.md mapeia todos os locais da cidade e substitui códigos em falas 
     assert.ok(locationNames.get(code).length > 0);
   }
 
-  const speech = 'leve essa encomenda para a CASA-02 na RUA-02';
+  const speech = 'leve essa encomenda para a [CASA-02] na [RUA-02] e ignore CASA-02 sem colchetes';
   assert.equal(
     replaceLocationCodesWithNames(speech, locationNames),
-    'leve essa encomenda para a Casa do Mauro na Rua dos Guararapes'
+    'leve essa encomenda para a **__Casa do Mauro__** na **__Rua dos Guararapes__** e ignore CASA-02 sem colchetes'
   );
 });
 
@@ -607,4 +609,31 @@ test('parseCharacterMarkdown lê sprite_cutscene opcional para retratos PNG em a
     'test.md',
   );
   assert.equal(customChar.sprites.cutscene, 'assets/test.png');
+});
+
+test('replaceStoryPlaceholders substitui locais, itens e personagens entre colchetes com negrito/sublinhado e parseRichTextTokens interpreta estilos', () => {
+  const locationNames = new Map([['CASA-01', 'Casa Inicial'], ['RUA-02', 'Rua dos Guararapes']]);
+  const items = new Map([['machado', { id: 'machado', name: 'Machado Dourado' }]]);
+  const characters = new Map([['guanabara', { id: 'guanabara', name: 'Guanabara' }]]);
+
+  const resolved = replaceStoryPlaceholders(
+    'Vá até a [CASA-01] na [RUA-02], pegue o [ITEM-MACHADO] e entregue para [Guanabara].',
+    { locationNames, items, characters },
+  );
+  assert.equal(
+    resolved,
+    'Vá até a **__Casa Inicial__** na **__Rua dos Guararapes__**, pegue o **__Machado Dourado__** e entregue para **__Guanabara__**.',
+  );
+
+  const tokens = parseRichTextTokens('Texto **negrito**, *itálico*, __sublinhado__ e **__Destaque__**');
+  assert.deepEqual(tokens, [
+    { text: 'Texto ', bold: false, italic: false, underline: false },
+    { text: 'negrito', bold: true, italic: false, underline: false },
+    { text: ', ', bold: false, italic: false, underline: false },
+    { text: 'itálico', bold: false, italic: true, underline: false },
+    { text: ', ', bold: false, italic: false, underline: false },
+    { text: 'sublinhado', bold: false, italic: false, underline: true },
+    { text: ' e ', bold: false, italic: false, underline: false },
+    { text: 'Destaque', bold: true, italic: false, underline: true },
+  ]);
 });

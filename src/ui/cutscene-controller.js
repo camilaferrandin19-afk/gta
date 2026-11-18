@@ -6,6 +6,7 @@ import {
   setUiInputMode,
 } from './input-mode.js?v=1';
 import { WebModalController } from './web-modal.js?v=1';
+import { renderRichText } from './rich-text.js?v=1';
 
 export class CutsceneController {
   constructor() {
@@ -209,7 +210,7 @@ export class CutsceneController {
     }
 
     this.speakerEl.textContent = step.speaker || '';
-    this.textEl.textContent = step.text || '';
+    renderRichText(this.textEl, step.text || '');
 
     const isLeftSpeaking = this.#matchesSpeaker(
       step.speaker,
@@ -241,7 +242,7 @@ export class CutsceneController {
         btn.type = 'button';
         btn.className = 'cutscene-choice-btn';
         if (isKeyboardUiMode() && idx === this.selectedChoiceIndex) btn.classList.add('selected');
-        btn.textContent = choice.label;
+        renderRichText(btn, choice.label);
         btn.addEventListener('click', () => {
           this.#selectChoice(choice);
         });

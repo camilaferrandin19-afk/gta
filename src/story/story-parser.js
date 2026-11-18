@@ -550,13 +550,71 @@ export function parseMapMarkdown(rawText, fileName = 'map/map.md') {
   return locationNames;
 }
 
-export function replaceLocationCodesWithNames(text, locationNames) {
-  if (!text || typeof text !== 'string' || !locationNames || locationNames.size === 0) {
+const LOC_CODE_TOKEN_RE = /^(?:RUA|CASA|COM|PRACA)-\d+$/i;
+
+function findItemByToken(items, token) {
+  if (!items || !(items instanceof Map)) return null;
+  const clean = token.trim();
+  const withoutPrefix = /^item-/i.test(clean) ? clean.slice(5).trim() : '';
+  const candidates = withoutPrefix ? [withoutPrefix, clean] : [clean];
+  for (const cand of candidates) {
+    const lower = cand.toLowerCase();
+    if (items.has(cand)) return items.get(cand);
+    if (items.has(lower)) return items.get(lower);
+    for (const item of items.values()) {
+      if (String(item.id || '').toLowerCase() === lower || String(item.name || '').toLowerCase() === lower) {
+        return item;
+      }
+    }
+  }
+  return null;
+}
+
+function findCharacterByToken(characters, token) {
+  if (!characters || !(characters instanceof Map)) return null;
+  const lower = token.trim().toLowerCase();
+  if (characters.has(lower)) return characters.get(lower);
+  for (const char of characters.values()) {
+    if (String(char.id || '').toLowerCase() === lower || String(char.name || '').toLowerCase() === lower) {
+      return char;
+    }
+  }
+  return null;
+}
+
+export function replaceStoryPlaceholders(text, { locationNames = null, items = null, characters = null } = {}) {
+  if (!text || typeof text !== 'string') {
     return text;
   }
-  return text.replace(/\b((?:RUA|CASA|COM|PRACA)-\d+)\b/gi, (match, code) => {
-    const resolved = locationNames.get(code.toUpperCase());
-    return resolved || match;
+  return text.replace(/\[([^\[\]\n]+)\]/g, (match, rawToken) => {
+    const token = rawToken.trim();
+    if (!token) return match;
+
+    if (LOC_CODE_TOKEN_RE.test(token) && locationNames instanceof Map) {
+      const resolved = locationNames.get(token.toUpperCase());
+      if (resolved) return `**__${resolved}__**`;
+    }
+
+    if (/^item-/i.test(token)) {
+      const item = findItemByToken(items, token);
+      if (item?.name) return `**__${item.name}__**`;
+    }
+
+    const char = findCharacterByToken(characters, token);
+    if (char?.name) return `**__${char.name}__**`;
+
+    const itemFallback = findItemByToken(items, token);
+    if (itemFallback?.name) return `**__${itemFallback.name}__**`;
+
+    return match;
+  });
+}
+
+export function replaceLocationCodesWithNames(text, locationNames, extras = {}) {
+  return replaceStoryPlaceholders(text, {
+    locationNames,
+    items: extras?.items || null,
+    characters: extras?.characters || null,
   });
 }
 
