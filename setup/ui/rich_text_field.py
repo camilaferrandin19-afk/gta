@@ -6,7 +6,6 @@ from typing import Callable
 from PySide6.QtWidgets import (
     QDialog,
     QHBoxLayout,
-    QInputDialog,
     QLineEdit,
     QPushButton,
     QVBoxLayout,
@@ -14,6 +13,8 @@ from PySide6.QtWidgets import (
 )
 
 from ..core.models import StoryPackage
+from .character_picker import CharacterPickerDialog
+from .item_picker import ItemPickerDialog
 from .map_picker import LocationPickerDialog
 
 
@@ -110,20 +111,16 @@ class RichTextLineWidget(QWidget):
         pkg = self._pkg_provider()
         if not pkg or not pkg.items:
             return
-        choices = [f'{it.name} ({iid})' for iid, it in pkg.items.items()]
-        ids = list(pkg.items.keys())
-        chosen, ok = QInputDialog.getItem(self, 'Inserir Item', 'Selecione o item:', choices, 0, False)
-        if ok and chosen in choices:
-            iid = ids[choices.index(chosen)]
-            self._insert_token(f'[ITEM-{iid}]')
+        dlg = ItemPickerDialog(self._app_root, pkg, parent=self)
+        if dlg.exec() == QDialog.DialogCode.Accepted and dlg.selected_item_id:
+            self._insert_token(f'[ITEM-{dlg.selected_item_id}]')
 
     def _insert_character(self) -> None:
         pkg = self._pkg_provider()
         if not pkg or not pkg.characters:
             return
-        choices = [f'{c.name} ({cid})' for cid, c in pkg.characters.items()]
-        names = [c.name or cid for cid, c in pkg.characters.items()]
-        chosen, ok = QInputDialog.getItem(self, 'Inserir Personagem', 'Selecione o personagem:', choices, 0, False)
-        if ok and chosen in choices:
-            cname = names[choices.index(chosen)]
-            self._insert_token(f'[{cname}]')
+        dlg = CharacterPickerDialog(self._app_root, pkg, parent=self)
+        if dlg.exec() == QDialog.DialogCode.Accepted:
+            cname = dlg.selected_character_name()
+            if cname:
+                self._insert_token(f'[{cname}]')

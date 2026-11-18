@@ -3,15 +3,11 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Callable
 
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QBrush, QColor, QPen
+from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QColorDialog,
     QComboBox,
     QFormLayout,
-    QGraphicsRectItem,
-    QGraphicsScene,
-    QGraphicsView,
     QGroupBox,
     QHBoxLayout,
     QLabel,
@@ -25,21 +21,10 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ..core.city_catalog import GRID_BLOCKS, is_building_code, load_canonical_city_locations
+from ..core.city_catalog import is_building_code, load_canonical_city_locations
 from ..core.models import MapLocation, StoryPackage
+from .map_picker import CityMapCanvas
 from .widgets import AssetPickerRow
-
-
-class ClickableBlockRect(QGraphicsRectItem):
-    def __init__(self, x: float, y: float, w: float, h: float, code: str, on_click: Callable[[str], None]) -> None:
-        super().__init__(x, y, w, h)
-        self.code = code
-        self._on_click = on_click
-        self.setAcceptHoverEvents(True)
-        self.setToolTip(code)
-
-    def mousePressEvent(self, event: object) -> None:
-        self._on_click(self.code)
 
 
 class MapLocationsTab(QWidget):
@@ -71,7 +56,7 @@ class MapLocationsTab(QWidget):
         self.search_edit = QLineEdit()
         self.search_edit.setPlaceholderText('Buscar por código ou nome...')
         self.kind_filter = QComboBox()
-        self.kind_filter.addItems(['TODOS', 'CASA', 'COM', 'PRACA', 'RUA'])
+        self.kind_filter.addItems(['TODOS', 'CASA', 'COM', 'PRACA', 'HOSP', 'RUA'])
         filter_row.addWidget(self.search_edit, 1)
         filter_row.addWidget(self.kind_filter)
 
@@ -84,12 +69,17 @@ class MapLocationsTab(QWidget):
         right_panel = QWidget()
         right_layout = QVBoxLayout(right_panel)
 
-        map_group = QGroupBox('Mapa Visual da Cidade-Base (clique para selecionar edificação/praça)')
+        map_group = QGroupBox('Mapa Visual da Cidade-Base (clique para selecionar local; use o scroll para zoom)')
         map_layout = QVBoxLayout(map_group)
-        self.scene = QGraphicsScene(self)
-        self.view = QGraphicsView(self.scene)
-        self.view.setMinimumHeight(240)
-        map_layout.addWidget(self.view)
+        self.map_canvas = CityMapCanvas(
+            self._canonical,
+            on_select=self.select_code,
+            buildings_only=False,
+            allow_roads=True,
+            parent=self,
+        )
+        self.map_canvas.setMinimumHeight(280)
+        map_layout.addWidget(self.map_canvas)
 
         edit_group = QGroupBox('Personalização do Local')
         form = QFormLayout(edit_group)
@@ -137,7 +127,7 @@ class MapLocationsTab(QWidget):
         self._pkg = pkg
         self._current_code = None
         self._refresh_list()
-        self._draw_visual_map()
+        self._draw_visual_map(fit=True)
 
     def _refresh_list(self) -> None:
         self.loc_list.clear()
@@ -156,31 +146,13 @@ class MapLocationsTab(QWidget):
             item.setData(256, code)
             self.loc_list.addItem(item)
 
-    def _draw_visual_map(self) -> None:
-        self.scene.clear()
+    def _draw_visual_map(self, fit: bool = False) -> None:
         if not self._pkg:
+            self.map_canvas.scene.clear()
             return
-        cell = 12
-        for code, meta in self._canonical.items():
-            if meta.kind == 'RUA':
-                continue
-            loc = self._pkg.locations.get(code)
-            x = (meta.grid_x % GRID_BLOCKS) * (cell + 2)
-            y = (meta.grid_y % GRID_BLOCKS) * (cell + 2)
-            rect = ClickableBlockRect(x, y, cell, cell, code, self.select_code)
-            if loc and loc.roof_color:
-                fill = QColor(loc.roof_color)
-            elif meta.kind == 'PRACA':
-                fill = QColor('#2d6a4f')
-            elif meta.kind == 'COM':
-                fill = QColor('#3d5a80')
-            else:
-                fill = QColor('#8d5b4c')
-            rect.setBrush(QBrush(fill))
-            border_color = '#f59e0b' if code == self._current_code else '#0e1015'
-            rect.setPen(QPen(QColor(border_color), 1.5 if code == self._current_code else 0.7))
-            rect.setToolTip(f'{code}: {loc.name if loc else meta.default_name}')
-            self.scene.addItem(rect)
+        self.map_canvas.render_map(self._pkg, self._current_code or '')
+        if fit:
+            self.map_canvas.fit_all()
 
     def select_code(self, code: str) -> None:
         if not self._pkg or code not in self._pkg.locations:
@@ -192,6 +164,7 @@ class MapLocationsTab(QWidget):
                 self.loc_list.setCurrentRow(row)
                 break
         self._draw_visual_map()
+        self.map_canvas.focus_code(code)
 
     def _on_list_selected(self, current: QListWidgetItem | None) -> None:
         if not current or not self._pkg:
@@ -201,6 +174,7 @@ class MapLocationsTab(QWidget):
         if loc:
             self._load_location(loc)
             self._draw_visual_map()
+            self.map_canvas.focus_code(code)
 
     def _load_location(self, loc: MapLocation) -> None:
         self._suppress = True

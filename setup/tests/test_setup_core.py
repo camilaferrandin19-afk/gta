@@ -5,6 +5,7 @@ import shutil
 import tempfile
 import unittest
 
+from setup.core.city_catalog import load_canonical_city_locations
 from setup.core.markdown_codec import (
     parse_map_markdown,
     serialize_map_markdown,
@@ -115,6 +116,21 @@ class SetupCoreTests(unittest.TestCase):
         bad_file.write_text('x', encoding='utf-8')
         with self.assertRaises(StoryIOError):
             import_asset_file(self.app_copy / 'story' / 'vibe-coding', bad_file)
+
+    def test_canonical_city_locations_match_official_map_coordinates(self) -> None:
+        locs = load_canonical_city_locations(self.app_copy)
+        casa_001 = locs['CASA-001']
+        com_001 = locs['COM-001']
+        praca_001 = locs['PRACA-001']
+        hosp_001 = locs['HOSP-001']
+
+        self.assertEqual((casa_001.grid_x, casa_001.grid_y), (1, 0))
+        self.assertEqual((casa_001.x, casa_001.y, casa_001.w, casa_001.h), (530.0, 156.0, 238.0, 133.0))
+        self.assertEqual((com_001.grid_x, com_001.grid_y), (0, 0))
+        self.assertEqual((com_001.x, com_001.y), (156.0, 156.0))
+        self.assertEqual((praca_001.grid_x, praca_001.grid_y), (2, 2))
+        self.assertEqual((praca_001.x, praca_001.y), (1018.0, 898.0))
+        self.assertEqual((hosp_001.x, hosp_001.y), (530.0, 1500.0))
 
 
 if __name__ == '__main__':
