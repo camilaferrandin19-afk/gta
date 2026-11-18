@@ -13,6 +13,7 @@ import {
   parseMapMarkdown,
   replaceLocationCodesWithNames,
   validateAssetPath,
+  parseStoryCatalog,
   StoryParseError
 } from '../src/story/story-parser.js';
 import {
@@ -30,11 +31,12 @@ import {
   resolveStoryFaviconUrl,
   isAssetLoaded,
   clearLoadedAssets,
-  parseNpcLinesMarkdown
+  parseNpcLinesMarkdown,
+  shouldShowStorySelector,
 } from '../src/story/story-loader.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const storyDir = path.resolve(__dirname, '../story');
+const storyDir = path.resolve(__dirname, '../story/vibe-coding');
 
 test('carrega e valida o pacote de história de exemplo completo contra a cidade-base', () => {
   const cityMap = new CityMap();
@@ -412,7 +414,7 @@ test('registra arquivos já carregados em memória e evita recarregamento desnec
 });
 
 test('parseNpcLinesMarkdown lê falas de NPCs de story/npc-lines.md ignorando cabeçalhos e marcadores', () => {
-  const sampleDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../story');
+  const sampleDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../story/vibe-coding');
   const raw = fs.readFileSync(path.join(sampleDir, 'npc-lines.md'), 'utf-8');
   const lines = parseNpcLinesMarkdown(raw);
   assert.ok(lines.length >= 200, `esperado >= 200 falas, obtido ${lines.length}`);
@@ -497,7 +499,7 @@ right: mentor
 
 test('parseEncounterMarkdown lê encontro extra em construção e rejeita local não edificável', () => {
   const map = new CityMap();
-  const sampleDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../story');
+  const sampleDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../story/vibe-coding');
   const raw = fs.readFileSync(path.join(sampleDir, 'missions/extra-casa-hostnet.md'), 'utf-8');
   const encounter = parseEncounterMarkdown(raw, 'missions/extra-casa-hostnet.md', map);
 
@@ -540,6 +542,33 @@ test('parseEncounterMarkdown lê encontro extra em construção e rejeita local 
         'bad.md',
         map,
       ),
+    StoryParseError,
+  );
+});
+
+test('parseStoryCatalog valida stories.json real, entrada direta para 1 história e rejeita catálogo inválido', () => {
+  const catalogPath = path.resolve(storyDir, '../stories.json');
+  const raw = fs.readFileSync(catalogPath, 'utf8');
+  const entries = parseStoryCatalog(raw, 'stories.json');
+  assert.equal(entries.length, 1);
+  assert.equal(entries[0].id, 'vibe-coding');
+  assert.equal(entries[0].path, './story/vibe-coding');
+  assert.equal(shouldShowStorySelector(entries), false);
+
+  const twoStories = parseStoryCatalog(JSON.stringify({
+    stories: [
+      { id: 'vibe-coding', title: 'Vibe Coding' },
+      { id: 'historia-dois', title: 'História Dois', description: 'Teste' },
+    ],
+  }));
+  assert.equal(twoStories.length, 2);
+  assert.equal(twoStories[1].path, './story/historia-dois');
+  assert.equal(shouldShowStorySelector(twoStories), true);
+
+  assert.throws(() => parseStoryCatalog('{invalid', 'stories.json'), StoryParseError);
+  assert.throws(() => parseStoryCatalog('{"stories":[]}', 'stories.json'), StoryParseError);
+  assert.throws(
+    () => parseStoryCatalog(JSON.stringify({ stories: [{ id: '../hack', title: 'X' }] }), 'stories.json'),
     StoryParseError,
   );
 });

@@ -20,6 +20,7 @@ export class PauseMenuController {
     this.newGameBtn = document.getElementById('pause-new-game-btn');
     this.refreshAssetsBtn = document.getElementById('pause-refresh-assets-btn');
     this.resetGameBtn = document.getElementById('pause-reset-game-btn');
+    this.changeStoryBtn = document.getElementById('pause-change-story-btn');
     this.exitBtn = document.getElementById('pause-exit-btn');
 
     this.isOpen = false;
@@ -57,6 +58,11 @@ export class PauseMenuController {
       this.callbacks.onResetGame?.();
     });
 
+    this.changeStoryBtn?.addEventListener('click', () => {
+      this.close();
+      this.callbacks.onChangeStory?.();
+    });
+
     this.exitBtn.addEventListener('click', () => {
       this.close();
       this.callbacks.onExitToTitle?.();
@@ -67,6 +73,11 @@ export class PauseMenuController {
     onUiInputModeChange(() => {
       if (this.isOpen) this.highlightSelection();
     });
+  }
+
+  setCanChangeStory(enabled) {
+    if (!this.changeStoryBtn) return;
+    this.changeStoryBtn.classList.toggle('hidden', !enabled);
   }
 
   getActiveButtons() {
@@ -80,6 +91,7 @@ export class PauseMenuController {
       this.newGameBtn,
       this.refreshAssetsBtn,
       this.resetGameBtn,
+      this.changeStoryBtn && !this.changeStoryBtn.classList.contains('hidden') ? this.changeStoryBtn : null,
       this.exitBtn,
     ].filter(Boolean);
   }
@@ -92,6 +104,7 @@ export class PauseMenuController {
       this.newGameBtn,
       this.refreshAssetsBtn,
       this.resetGameBtn,
+      this.changeStoryBtn,
       this.exitBtn,
       this.missionSelectBackBtn,
       ...this.missionListEl.querySelectorAll('button')

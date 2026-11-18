@@ -51,12 +51,14 @@ export class Engine {
 
     this.cityMap = options.cityMap || null;
     this.storyPackage = options.storyPackage || null;
+    this.storyKey = options.storyKey || this.storyPackage?.title || 'default';
     this.locationNames = this.storyPackage?.locationNames || new Map();
     this.cutscene = options.cutscene || null;
     this.pauseMenu = options.pauseMenu || null;
     this.inventoryController = options.inventoryController || null;
     this.preloadedUrls = options.preloadedUrls || new Set();
     this.onExitToTitle = options.onExitToTitle || null;
+    this.onChangeStory = options.onChangeStory || null;
     this.onNewGame = options.onNewGame || null;
     this.onRefreshAssets = options.onRefreshAssets || null;
     this.onResetGame = options.onResetGame || null;
@@ -234,7 +236,7 @@ export class Engine {
   #persistSaveState() {
     if (!this.storyPackage || this.player?.isDead || this.deathSequence) return;
     const snapshot = createSaveSnapshot({
-      storyKey: this.storyPackage.title || 'default',
+      storyKey: this.storyKey || this.storyPackage.title || 'default',
       currentMissionIndex: this.currentMissionIndex,
       unlockedMissionIndices: [...this.unlockedMissionIndices],
       freeRoamMode: this.freeRoamMode,
@@ -282,6 +284,10 @@ export class Engine {
       },
       onResetGame: () => {
         this.onResetGame?.();
+      },
+      onChangeStory: () => {
+        this.#persistSaveState();
+        this.onChangeStory?.();
       },
       onExitToTitle: () => {
         this.#persistSaveState();
@@ -391,6 +397,10 @@ export class Engine {
       },
       onResetGame: () => {
         this.onResetGame?.();
+      },
+      onChangeStory: () => {
+        this.#persistSaveState();
+        this.onChangeStory?.();
       },
       onExitToTitle: () => {
         this.#persistSaveState();
@@ -527,6 +537,10 @@ export class Engine {
       },
       onResetGame: () => {
         this.onResetGame?.();
+      },
+      onChangeStory: () => {
+        this.#persistSaveState();
+        this.onChangeStory?.();
       },
       onExitToTitle: () => {
         this.#persistSaveState();

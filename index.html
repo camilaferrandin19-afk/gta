@@ -12,14 +12,14 @@
   <meta property="og:type" content="website">
   <meta property="og:title" content="Missão Vibe Coding — Curso em Vídeo">
   <meta property="og:description" content="Cruzando a cidade para descobrir o segredo guardado em uma caixa secreta e lidando com GPUs, servidores e robôs!">
-  <meta property="og:image" content="./story/splash/splash-start.png">
+  <meta property="og:image" content="./story/vibe-coding/splash/splash-start.png">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Missão Vibe Coding — Curso em Vídeo">
   <meta name="twitter:description" content="Cruzando a cidade para descobrir o segredo guardado em uma caixa secreta e lidando com GPUs, servidores e robôs!">
-  <meta name="twitter:image" content="./story/splash/splash-start.png">
+  <meta name="twitter:image" content="./story/vibe-coding/splash/splash-start.png">
   <link rel="manifest" href="./manifest.webmanifest">
-  <link rel="icon" type="image/svg+xml" href="./story/favicon.svg">
-  <link rel="shortcut icon" href="./story/favicon.svg">
+  <link rel="icon" type="image/svg+xml" href="./story/vibe-coding/favicon.svg">
+  <link rel="shortcut icon" href="./story/vibe-coding/favicon.svg">
   <link rel="apple-touch-icon" sizes="180x180" href="./icon-180.png">
   <title>Missão Vibe Coding — Curso em Vídeo</title>
   <link rel="stylesheet" href="./styles/main.css?v=42">
@@ -143,6 +143,15 @@
       </div>
     </div>
 
+    <section id="story-selector-screen" class="overlay-screen hidden" role="dialog" aria-label="Escolher História">
+      <div class="overlay-card story-selector-card">
+        <h1 class="retro-title">ESCOLHER HISTÓRIA</h1>
+        <p class="overlay-subtitle">Selecione qual campanha você deseja jogar.</p>
+        <p id="story-selector-error" class="error-message hidden" role="alert"></p>
+        <div id="story-selector-list" class="story-selector-list"></div>
+      </div>
+    </section>
+
     <section id="start-screen" class="overlay-screen start-screen hidden">
       <div class="start-backdrop" aria-hidden="true">
         <img id="start-splash-bg" class="start-splash-bg hidden" alt="">
@@ -240,6 +249,7 @@
           <button id="pause-new-game-btn" type="button" class="secondary-button">NOVO JOGO</button>
           <button id="pause-refresh-assets-btn" type="button" class="secondary-button">RECARREGAR ASSETS</button>
           <button id="pause-reset-game-btn" type="button" class="secondary-button">RESET DO JOGO</button>
+          <button id="pause-change-story-btn" type="button" class="secondary-button hidden">TROCAR DE HISTÓRIA</button>
           <button id="pause-exit-btn" type="button" class="danger-button">SAIR</button>
         </div>
       </div>

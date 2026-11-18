@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   SAVE_STORAGE_KEY,
+  getSaveStorageKey,
   createSaveSnapshot,
   saveGameState,
   loadGameState,
@@ -36,7 +37,7 @@ test('salva, carrega e limpa estado do jogo e inventário com escopo por histór
   });
 
   assert.equal(saveGameState(snapshot, storage), true);
-  assert.ok(storage.getItem(SAVE_STORAGE_KEY));
+  assert.ok(storage.getItem(getSaveStorageKey('Missão Vibe Coding')));
 
   const loaded = loadGameState('Missão Vibe Coding', storage);
   assert.ok(loaded);
@@ -48,7 +49,7 @@ test('salva, carrega e limpa estado do jogo e inventário com escopo por histór
   assert.equal(loaded.player.health, 87);
 
   assert.equal(loadGameState('Outra História', storage), null);
-  assert.equal(clearGameState(storage), true);
+  assert.equal(clearGameState('Missão Vibe Coding', storage), true);
   assert.equal(loadGameState('Missão Vibe Coding', storage), null);
 });
 
@@ -80,6 +81,7 @@ test('persiste missões desbloqueadas e mantém apenas a primeira missão no nov
   assert.deepEqual(loadedProgressed.unlockedMissionIndices, [0, 1]);
 
   // Save antigo sem campo unlockedMissionIndices mantém missões até currentMissionIndex
+  clearGameState('Missão Vibe Coding', storage);
   storage.setItem(SAVE_STORAGE_KEY, JSON.stringify({
     version: 1,
     storyKey: 'Missão Vibe Coding',
@@ -89,4 +91,32 @@ test('persiste missões desbloqueadas e mantém apenas a primeira missão no nov
   }));
   const loadedLegacy = loadGameState('Missão Vibe Coding', storage);
   assert.deepEqual(loadedLegacy.unlockedMissionIndices, [0, 1, 2]);
+});
+
+test('saveGameState mantém progresso isolado por história sem sobrescrever outra campanha', () => {
+  const storage = createMemoryStorage();
+  const snapA = createSaveSnapshot({
+    storyKey: 'vibe-coding',
+    currentMissionIndex: 3,
+    player: { x: 100, y: 200, angle: 0, health: 90 },
+  });
+  const snapB = createSaveSnapshot({
+    storyKey: 'outra-historia',
+    currentMissionIndex: 1,
+    player: { x: 300, y: 400, angle: 1, health: 75 },
+  });
+
+  assert.equal(saveGameState(snapA, storage), true);
+  assert.equal(saveGameState(snapB, storage), true);
+
+  const loadedA = loadGameState('vibe-coding', storage);
+  const loadedB = loadGameState('outra-historia', storage);
+  assert.equal(loadedA.currentMissionIndex, 3);
+  assert.equal(loadedA.player.x, 100);
+  assert.equal(loadedB.currentMissionIndex, 1);
+  assert.equal(loadedB.player.x, 300);
+
+  clearGameState('vibe-coding', storage);
+  assert.equal(loadGameState('vibe-coding', storage), null);
+  assert.equal(loadGameState('outra-historia', storage).currentMissionIndex, 1);
 });
