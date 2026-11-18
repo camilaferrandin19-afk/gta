@@ -294,7 +294,7 @@ async function boot() {
     const signal = assetsRefreshDialog.open();
     try {
       const result = await refreshAllStoryAssets({
-        basePath: './story',
+        basePath: selectedStory?.path || './story/vibe-coding',
         cityMap,
         preloadedUrls,
         signal,
