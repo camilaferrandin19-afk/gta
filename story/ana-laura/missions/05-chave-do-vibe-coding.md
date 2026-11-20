@@ -5,21 +5,21 @@ start: CASA-656
 pickup: PRACA-029
 pickup_objective: Pegue a Chave Mestra em [PRACA-029]
 target: CASA-353
-objective: Leve a Chave Mestra até Camila em [CASA-353]
+objective: Leve a Chave Mestra até Lucia em [CASA-353]
 give_item: chave-secreta
 require_item: chave-secreta
-delivery_prompt: Camila está com a Caixa Secreta em [CASA-353]. Entregue a Chave Mestra para abri-la:
+delivery_prompt: Lucia está com a Caixa Secreta em [CASA-353]. Entregue a Chave Mestra para abri-la:
 wrong_item_message: Essa chave não gira nem parafuso! Cadê a Chave Mestra?
 ---
 
 ## CUTSCENE_INICIO
 left: ana-laura
-right: camila
+right: lucia
 bg: Sudeste da cidade em CASA-656
 
-- Camila: Ana Laura, o Jason e eu já preparamos toda a bancada aqui em [CASA-353]! Só falta a Chave Mestra que o Sam Maltmon mencionou!
+- Lucia: Ana Laura, o Jason e eu já preparamos toda a bancada aqui em [CASA-353]! Só falta a Chave Mestra que o Sam Maltmon mencionou!
 - Ana Laura: Tô saindo do Sudeste agora mesmo! A [PRACA-029] fica logo ali na esquina.
-- Camila: Pega a chave e vem pro Centro! Toda a equipe está curiosa para saber o que tem dentro da Caixa Secreta!
+- Lucia: Pega a chave e vem pro Centro! Toda a equipe está curiosa para saber o que tem dentro da Caixa Secreta!
 
 ## CUTSCENE_FIM
 left: none

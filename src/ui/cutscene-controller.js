@@ -1,4 +1,4 @@
-import { pickCutsceneBackground } from '../story/story-loader.js?v=14';
+import { pickCutsceneBackground } from '../story/story-loader.js?v=15';
 import {
   bindHoverClearsKeyboardFocus,
   isKeyboardUiMode,

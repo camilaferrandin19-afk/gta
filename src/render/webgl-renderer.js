@@ -1,5 +1,5 @@
 import { createTextureAtlas } from './texture-atlas.js?v=18';
-import { createLightAtlas, createDayCycle } from './lighting.js?v=1';
+import { createLightAtlas, createDayCycle } from './lighting.js?v=2';
 
 const VERTEX_SHADER = `
   attribute vec2 a_position;
@@ -168,7 +168,7 @@ export class WebGLRenderer {
 
   // Passe de iluminação: escurece a cena conforme a hora do dia e soma as luzes
   // (faróis, postes, portas acesas, fogo) com blend aditivo. Por fim, vinheta.
-  #renderLighting({ camera, cityMap, vehicles, boats, explosions, player, visibleBlocks, time }) {
+  #renderLighting({ camera, cityMap, vehicles, boats, explosions, player, visibleBlocks, time, weaponFx = [] }) {
     const gl = this.gl;
     const sky = this.dayCycle.sample(time);
     const insideFactor = player.insideLocationCode ? 0.35 : 1;
@@ -262,6 +262,11 @@ export class WebGLRenderer {
         }
       }
 
+      for (const v of vehicles) {
+        if (!v.special || v.destroyed || !inView(v.x, v.y)) continue;
+        this.#pushQuad(v.x - v.length, v.y - v.width * 1.3, v.length * 2, v.width * 2.6, v.angle, 'glow', [1, 0.25, 0.7, 0.6 * lights]);
+      }
+
       for (const boat of boats) {
         if (!inView(boat.x, boat.y)) continue;
         glow(boat.x, boat.y, 46, [0.6, 0.85, 1], 0.4);
@@ -275,6 +280,12 @@ export class WebGLRenderer {
       for (const ex of explosions) {
         const p = Math.min(1, ex.timer / ex.duration);
         glow(ex.x, ex.y, ex.radius * 5, [1, 0.6, 0.2], (1 - p) * 0.9);
+      }
+
+      // Clarão dos tiros ilumina a rua
+      for (const fx of weaponFx) {
+        if (fx.kind !== 'muzzle') continue;
+        glow(fx.x, fx.y, 130, [1, 0.8, 0.4], 0.7 * (1 - fx.life / fx.maxLife));
       }
 
       // Halo discreto ao redor do jogador para não sumir no escuro
@@ -464,7 +475,7 @@ export class WebGLRenderer {
     this.#pushQuad(x - 4.5, y - 2, 9, 9, 0, 'disc', [0.22, 0.14, 0.08, 1]);
   }
 
-  renderFrame({ camera, cityMap, vehicles, boats = [], trashBins = [], pedestrians = [], player, playerSprites = null, skidMarks, bloodMarks = [], smokeParticles = [], explosions = [], worldCollectibles = [], objectivePoint, objectiveNpcPoint, completedNpcPoints = [], encounterLocations = null, emitNpcWaves = false, time }) {
+  renderFrame({ camera, cityMap, vehicles, boats = [], trashBins = [], pedestrians = [], player, playerSprites = null, partner = null, bullets = [], weaponFx = [], skidMarks, bloodMarks = [], smokeParticles = [], explosions = [], worldCollectibles = [], objectivePoint, objectiveNpcPoint, completedNpcPoints = [], encounterLocations = null, emitNpcWaves = false, time }) {
     const gl = this.gl;
     this.quadCount = 0;
 
@@ -839,6 +850,25 @@ export class WebGLRenderer {
           this.#pushQuad(hx - 12, hy - 5, 24, 10, v.angle, 'circle', [1.0, 0.94, 0.55, entryPulse * 0.7]);
         }
       }
+      // Neon rosa embaixo do carro especial
+      if (v.special && !v.destroyed) {
+        const pulse = 0.85 + Math.sin(time * 4 + v.x * 0.01) * 0.15;
+        const gl = dentLength * 1.7 * pulseScale;
+        const gw = dentWidth * 2.3 * pulseScale;
+        this.#pushQuad(v.x - gl * 0.5, v.y - gw * 0.5, gl, gw, v.angle, 'circle', [1, 0.25, 0.7, 0.55 * pulse]);
+      }
+      // Chamas do escapamento (turbo / especial acelerando)
+      if ((v.special || v.turbo) && !v.destroyed && v.driver === 'player' && (v.accelHoldTime || 0) > 0.05 && v.speed > 60) {
+        const cosA = Math.cos(v.angle);
+        const sinA = Math.sin(v.angle);
+        const flick = 0.75 + Math.random() * 0.5;
+        for (const s of [-0.25, 0.25]) {
+          const fx = v.x - cosA * (dentLength * 0.5 + 6) - sinA * dentWidth * s;
+          const fy = v.y - sinA * (dentLength * 0.5 + 6) + cosA * dentWidth * s;
+          this.#pushQuad(fx - 9 * flick, fy - 4, 18 * flick, 8, v.angle, 'circle', [0.35, 0.6, 1, 0.85]);
+          this.#pushQuad(fx - 5, fy - 2.5, 10, 5, v.angle, 'circle', [1, 0.95, 0.8, 0.9]);
+        }
+      }
       // Sombra suave projetada (luz vindo de cima-esquerda)
       {
         const shL = dentLength * 1.42 * pulseScale;
@@ -854,6 +884,17 @@ export class WebGLRenderer {
         v.kind,
         rgba
       );
+      // Faixas de corrida douradas no carro especial
+      if (v.special && !v.destroyed) {
+        const cosA = Math.cos(v.angle);
+        const sinA = Math.sin(v.angle);
+        for (const s of [-2.6, 2.6]) {
+          const sx = v.x - sinA * s * pulseScale;
+          const sy = v.y + cosA * s * pulseScale;
+          const sl = dentLength * 0.92 * pulseScale;
+          this.#pushQuad(sx - sl * 0.5, sy - 1.1, sl, 2.2, v.angle, 'solid', [1, 0.84, 0.3, 0.9]);
+        }
+      }
       if (vHealth < 75 && !v.destroyed) {
         const cos = Math.cos(v.angle);
         const sin = Math.sin(v.angle);
@@ -1093,6 +1134,49 @@ export class WebGLRenderer {
     const playerVehicle = player.inVehicleId ? vehicles.find((v) => v.id === player.inVehicleId) : null;
     const ridingMoto = Boolean(playerVehicle && playerVehicle.kind === 'moto');
 
+    // Parceira: a pé ao lado da protagonista ou na garupa da moto
+    if (partner && partner.visible) {
+      const onMoto = partner.state === 'riding' && ridingMoto;
+      const ang = onMoto ? playerVehicle.angle : partner.angle;
+      const cx = onMoto ? playerVehicle.x - Math.cos(ang) * 10 : partner.x;
+      const cy = onMoto ? playerVehicle.y - Math.sin(ang) * 10 : partner.y;
+      if (cx > minX && cx < maxX && cy > minY && cy < maxY && !isCoveredByClosedRoof(cx, cy)) {
+        const ps = partner.sprites || {};
+        const skin = hexToRgb01(ps.skinColor);
+        const sleeve = hexToRgb01(ps.sleeveColor, skin);
+        const pants = hexToRgb01(ps.pantsColor, [0.16, 0.23, 0.36]);
+        const shoes = hexToRgb01(ps.shoeColor, [0.88, 0.91, 0.96]);
+        const cos = Math.cos(ang);
+        const sin = Math.sin(ang);
+        const limb = (fwd, side, w, h, col, rot = 0) => {
+          const lx = cx + cos * fwd - sin * side;
+          const ly = cy + sin * fwd + cos * side;
+          this.#pushQuad(lx - w * 0.5, ly - h * 0.5, w, h, ang + rot, 'disc', [col[0], col[1], col[2], 1]);
+        };
+        if (!onMoto) {
+          this.#pushQuad(cx + 3 - 21, cy + 5 - 21, 42, 42, 0, 'softshadow', [0, 0, 0, 0.32]);
+        }
+        const swing = !onMoto && partner.speed > 5 ? Math.sin(partner.walkPhase || 0) * 6 : 0;
+        if (onMoto) {
+          limb(1, -7, 8.2, 5.4, pants); limb(1, 7, 8.2, 5.4, pants);
+          limb(4, -9, 7.5, 4.4, sleeve, 0.5); limb(4, 9, 7.5, 4.4, sleeve, -0.5);
+        } else {
+          limb(swing, -5, 8.2, 5.4, pants); limb(swing + 3.8, -5, 5.2, 4.6, shoes);
+          limb(-swing, 5, 8.2, 5.4, pants); limb(-swing + 3.8, 5, 5.2, 4.6, shoes);
+          limb(-swing * 0.85 + 2, -11, 7.5, 4.4, sleeve); limb(-swing * 0.85 + 5.6, -11, 4.8, 4.8, skin);
+          limb(swing * 0.85 + 2, 11, 7.5, 4.4, sleeve); limb(swing * 0.85 + 5.6, 11, 4.8, 4.8, skin);
+        }
+        const entry = ps.top ? this.#getOrLoadLogoTexture(ps.top) : null;
+        if (entry && entry.loaded && entry.texture) {
+          const aspect = entry.width / Math.max(1, entry.height);
+          pendingCustomQuads.push({ cx, cy, w: 56 * aspect, h: 56, angle: ang - Math.PI * 0.5, entry, alpha: 1 });
+        } else {
+          this.#pushQuad(cx - 9, cy - 9, 18, 18, 0, 'disc', [0.17, 0.42, 0.26, 1]);
+          this.#pushQuad(cx - 5, cy - 5, 10, 10, 0, 'disc', [0.5, 0.37, 0.22, 1]);
+        }
+      }
+    }
+
     if (!player.inVehicleId || ridingMoto) {
       const pScale = ridingMoto
         ? (playerVehicle.sinkScale ?? 1)
@@ -1153,9 +1237,19 @@ export class WebGLRenderer {
         // Pernas alternadas com calça arredondada e tênis
         drawLeg(swing, -5.0, 0);
         drawLeg(-swing, 5.0, 0);
-        // Braços alternados (opostos às pernas) com antebraço e mão na cor da pele
-        drawArm(-swing * 0.85 + 2.0, -11.0, 0);
-        drawArm(swing * 0.85 + 2.0, 11.0, 0);
+        const armedWith = player.weaponId && player.weaponId !== 'punhos' ? player.weaponId : null;
+        if (armedWith) {
+          // Pose de mira: braços para a frente segurando a arma
+          const gunLen = armedWith === 'escopeta' ? 19 : armedWith === 'submetralhadora' ? 14 : 9;
+          drawLimb(15 + gunLen * 0.5, 3, gunLen, 3.4, [0.1, 0.1, 0.12], 0, 'solid');
+          if (armedWith !== 'pistola') drawLimb(13, 3, 5, 4.6, [0.16, 0.16, 0.19], 0, 'solid');
+          drawArm(7, -6.5, 0.55);
+          drawArm(8, 7.5, -0.35);
+        } else {
+          // Braços alternados (opostos às pernas) com antebraço e mão na cor da pele
+          drawArm(-swing * 0.85 + 2.0, -11.0, 0);
+          drawArm(swing * 0.85 + 2.0, 11.0, 0);
+        }
       }
 
       if (hasCustomSprite) {
@@ -1316,6 +1410,28 @@ export class WebGLRenderer {
       }
     }
 
+    // Rastros das balas, clarão do cano e faíscas de impacto
+    for (const b of bullets) {
+      const dx = b.x - (b.prevX ?? b.x);
+      const dy = b.y - (b.prevY ?? b.y);
+      const len = Math.max(6, Math.hypot(dx, dy));
+      const mx = b.x - dx * 0.5;
+      const my = b.y - dy * 0.5;
+      this.#pushQuad(mx - len * 0.5, my - 1.1, len, 2.2, Math.atan2(dy, dx), 'solid', [1, 0.9, 0.55, 0.9]);
+    }
+    for (const fx of weaponFx) {
+      const t = fx.life / fx.maxLife;
+      if (fx.kind === 'muzzle') {
+        const s = 16 * (1 - t * 0.4);
+        this.#pushQuad(fx.x - s * 0.5, fx.y - s * 0.3, s, s * 0.6, fx.angle, 'circle', [1, 0.85, 0.4, 0.95 * (1 - t)]);
+        this.#pushQuad(fx.x - 4, fx.y - 4, 8, 8, 0, 'circle', [1, 1, 0.9, 1 - t]);
+      } else {
+        const s = (fx.kind === 'hit' ? 12 : 9) * (0.6 + t);
+        const col = fx.kind === 'hit' ? [1, 1, 1, 0.8 * (1 - t)] : [1, 0.8, 0.3, 0.9 * (1 - t)];
+        this.#pushQuad(fx.x - s * 0.5, fx.y - s * 0.5, s, s, 0, 'circle', col);
+      }
+    }
+
     gl.clearColor(0.08, 0.09, 0.12, 1);
     gl.clear(gl.COLOR_BUFFER_BIT);
 
@@ -1358,6 +1474,6 @@ export class WebGLRenderer {
       gl.bindTexture(gl.TEXTURE_2D, this.texture);
     }
 
-    this.#renderLighting({ camera, cityMap, vehicles, boats, explosions, player, visibleBlocks, time });
+    this.#renderLighting({ camera, cityMap, vehicles, boats, explosions, player, visibleBlocks, time, weaponFx });
   }
 }

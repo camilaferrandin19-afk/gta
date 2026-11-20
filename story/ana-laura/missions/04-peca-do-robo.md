@@ -32,4 +32,4 @@ bg: Interior da CASA-656
 - ENTREGAR: peca-robo
 - Sam Maltmon: Excelente! Agora posso revelar o que o robô estava protegendo o tempo todo...
 - Ana Laura: Não me diga que era a chave daquela Caixa Secreta!
-- Sam Maltmon: Exatamente! A Chave Mestra está na [PRACA-029], bem pertinho daqui. Pega ela e corre para encontrar a Camila em [CASA-353], no Centro. Chegou a hora de abrir a caixa!
+- Sam Maltmon: Exatamente! A Chave Mestra está na [PRACA-029], bem pertinho daqui. Pega ela e corre para encontrar a Lucia em [CASA-353], no Centro. Chegou a hora de abrir a caixa!

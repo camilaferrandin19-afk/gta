@@ -3,7 +3,7 @@ import { RoadPathfinder } from '../world/pathfinding.js';
 import { TrafficManager } from '../world/traffic-manager.js?v=24';
 import { BoatManager } from '../world/boat-manager.js?v=17';
 import { InputManager } from '../input/input-manager.js?v=21';
-import { WebGLRenderer } from '../render/webgl-renderer.js?v=34';
+import { WebGLRenderer } from '../render/webgl-renderer.js?v=36';
 import { isInWater, resolveCircleStaticObstacle, resolveEntityCollisions, resolveVehiclePairCollision } from '../physics/collision.js?v=11';
 import {
   applyPedestrianDamage,
@@ -17,16 +17,23 @@ import {
   findSafeExitPosition,
   hitTrashBin,
   isTouchingVehicle,
+  resolvePedestrianEnvironmentCollisions,
   updateEjectedPlayer,
   updatePedestrian,
   updateTrashBin,
   updateVehicle,
-  updateVehicleCriticalState
-} from '../physics/vehicle-physics.js?v=18';
+  updateVehicleCriticalState,
+  VEHICLE_PROFILES
+} from '../physics/vehicle-physics.js?v=19';
 import { Minimap } from '../ui/minimap.js?v=27';
 import { Inventory } from './inventory.js?v=20';
 import { createSaveSnapshot, saveGameState } from './save-state.js?v=2';
 import { getPendingMissionAssetUrls, preloadMissionAssets } from '../story/story-loader.js';
+import { createPartner, pickLine, updatePartner } from '../world/partner.js?v=1';
+import { createCheatBuffer, SPECIAL_CAR_PROFILE, turboProfile } from './cheats.js?v=1';
+import {
+  createArsenal, cycleWeapon, giveAllWeapons, selectWeapon, startReload, stepBullets, tickArsenal, tryFire, WEAPONS, WEAPON_ORDER,
+} from './weapons.js?v=1';
 
 const PEDESTRIAN_CHAT_LINES = [
   'Opa! Cuidado com o trânsito por aqui!',
@@ -55,6 +62,9 @@ export class Engine {
     this.locationNames = this.storyPackage?.locationNames || new Map();
     this.#initCameraZoom(canvas);
     this.#initProtagonistHud();
+    this.#initPartner();
+    this.cheatBuffer = createCheatBuffer();
+    this.#initWeapons(canvas);
     this.cutscene = options.cutscene || null;
     this.pauseMenu = options.pauseMenu || null;
     this.inventoryController = options.inventoryController || null;
@@ -164,6 +174,22 @@ export class Engine {
         return;
       }
       if (this.cutscene?.active) return;
+      if (!this.paused && !this.inventoryController?.isOpen && !this.hud.isExpandedMapOpen() && !e.repeat) {
+        const cheat = this.cheatBuffer.push(e.key);
+        if (cheat) {
+          this.#activateCheat(cheat);
+          return; // a última letra do código não aciona a função normal da tecla
+        }
+      }
+      if (!this.paused && !this.inventoryController?.isOpen && !this.hud.isExpandedMapOpen()) {
+        if (/^Digit[1-4]$/.test(e.code)) {
+          selectWeapon(this.weapons.arsenal, WEAPON_ORDER[Number(e.code.slice(5)) - 1]);
+        } else if (e.code === 'KeyG' && !e.repeat) {
+          cycleWeapon(this.weapons.arsenal, 1);
+        } else if (e.code === 'KeyR') {
+          startReload(this.weapons.arsenal);
+        }
+      }
       if (e.key === 'i' || e.key === 'I' || e.key === 'Tab') {
         e.preventDefault();
         if (this.hud.isExpandedMapOpen()) this.closeExpandedMap();
@@ -1216,10 +1242,12 @@ export class Engine {
       this.lastTimestamp = now;
       this.pendingContextPrompt = null;
       this.pendingNameplate = null;
+      this.pendingPartnerNameplate = null;
       this.update(dt);
       // Só a rota normal do update preenche o balão/nome; pausa, cutscene, morte etc. os escondem
       this.hud.setContextPrompt?.(this.pendingContextPrompt);
       this.hud.setNameplate?.(this.pendingNameplate);
+      this.hud.setNameplate?.(this.pendingPartnerNameplate, 'partner-nameplate');
       this.render();
       requestAnimationFrame(tick);
     };
@@ -2124,8 +2152,25 @@ export class Engine {
       health: this.hudDisplayHealth
     });
 
+    this.#updatePartnerFollow(dt, currentVehicle);
+    this.#updateWeapons(dt, currentVehicle);
+    {
+      const ars = this.weapons.arsenal;
+      const w = WEAPONS[ars.current];
+      this.hud.setWeaponStatus?.({
+        id: w.id,
+        name: w.name,
+        melee: Boolean(w.melee),
+        mag: ars.mag[w.id] || 0,
+        reserve: ars.reserve[w.id] || 0,
+        reloading: ars.reloadTimer > 0,
+        armedCount: ars.owned.size - 1,
+        inVehicle: Boolean(currentVehicle),
+      });
+    }
     this.#updateVehicleGuidance(currentVehicle);
     this.#updateNameplate(currentVehicle);
+    this.#updatePartnerNameplate();
   }
 
   // Cartão da protagonista no HUD (retrato + nome) e nome flutuando sobre ela.
@@ -2141,6 +2186,320 @@ export class Engine {
       portrait: prot.sprites?.cutscene || '',
       fallback: prot.sprites?.front || '',
     });
+  }
+
+  // ---- Armas (estilo GTA) ----
+  #initWeapons(canvas) {
+    const arsenal = createArsenal();
+    this.weapons = {
+      arsenal,
+      giveAll: () => giveAllWeapons(arsenal),
+    };
+    this.bullets = [];
+    this.weaponFx = [];
+    this.mouseScreen = null;
+    this.mouseMovedAt = -Infinity;
+    this.mouseFiring = false;
+    this.fireKeyHeld = false;
+    this.prevFireHeld = false;
+    this.shootLineCooldown = 0;
+
+    const isUiTarget = (t) => Boolean(t?.closest?.('button, a, input, select, textarea, [role="button"], #minimap-container, .hud-pill, #touch-controls'));
+    window.addEventListener('mousemove', (e) => {
+      this.mouseScreen = { x: e.clientX, y: e.clientY };
+      this.mouseMovedAt = performance.now();
+    });
+    window.addEventListener('mousedown', (e) => {
+      if (e.button !== 0 || isUiTarget(e.target)) return;
+      this.mouseScreen = { x: e.clientX, y: e.clientY };
+      this.mouseMovedAt = performance.now();
+      this.mouseFiring = true;
+    });
+    window.addEventListener('mouseup', (e) => {
+      if (e.button === 0) this.mouseFiring = false;
+    });
+    // K atira no teclado (Ctrl não: Ctrl+W fecharia a aba do navegador)
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'KeyK') this.fireKeyHeld = true;
+    });
+    window.addEventListener('keyup', (e) => {
+      if (e.code === 'KeyK') this.fireKeyHeld = false;
+    });
+    window.addEventListener('blur', () => {
+      this.mouseFiring = false;
+      this.fireKeyHeld = false;
+    });
+    this.canvasEl = canvas;
+  }
+
+  #screenToWorld(sx, sy) {
+    const zoom = this.renderer?.zoom || 1;
+    const viewW = this.renderer?.viewWidth || window.innerWidth;
+    const viewH = this.renderer?.viewHeight || window.innerHeight;
+    return { x: (sx - viewW * 0.5) / zoom + this.camera.x, y: (sy - viewH * 0.5) / zoom + this.camera.y };
+  }
+
+  #updateWeapons(dt, currentVehicle) {
+    const arsenal = this.weapons.arsenal;
+    tickArsenal(arsenal, dt);
+    this.shootLineCooldown = Math.max(0, this.shootLineCooldown - dt);
+    const weapon = WEAPONS[arsenal.current];
+    const armed = weapon && !weapon.melee;
+    if (this.canvasEl) this.canvasEl.style.cursor = armed && !currentVehicle ? 'crosshair' : '';
+
+    const canAct = !currentVehicle && !this.player.enteringVehicle && !this.player.exitingVehicle
+      && !this.player.ejected?.active && !((this.player.knockdownTimer || 0) > 0) && !this.player.isDead;
+
+    // Mira: com mouse (desktop) vira para o cursor; sem mouse, atira para onde olha
+    const mouseAiming = this.mouseScreen && performance.now() - this.mouseMovedAt < 5000;
+    let aimAngle = this.player.angle;
+    if (canAct && mouseAiming) {
+      const w = this.#screenToWorld(this.mouseScreen.x, this.mouseScreen.y);
+      aimAngle = Math.atan2(w.y - this.player.y, w.x - this.player.x);
+      if (armed) this.player.angle = aimAngle;
+    }
+    this.player.weaponId = canAct ? arsenal.current : null;
+
+    const held = this.mouseFiring || this.fireKeyHeld;
+    const justPressed = held && !this.prevFireHeld;
+    this.prevFireHeld = held;
+
+    if (canAct && held && (justPressed || weapon?.auto)) {
+      const cos = Math.cos(aimAngle);
+      const sin = Math.sin(aimAngle);
+      const origin = { x: this.player.x + cos * 18 - sin * 6, y: this.player.y + sin * 18 + cos * 6 };
+      const res = tryFire(arsenal, origin, aimAngle);
+      if (res?.kind === 'shot') {
+        this.bullets.push(...res.bullets);
+        this.weaponFx.push({ kind: 'muzzle', x: origin.x, y: origin.y, angle: aimAngle, life: 0, maxLife: 0.06 });
+        this.#panicPedestrians(this.player.x, this.player.y, 430);
+        if (this.shootLineCooldown <= 0) {
+          this.partnerSay('shoot');
+          this.shootLineCooldown = 12;
+        }
+      } else if (res?.kind === 'melee') {
+        this.#doMelee(aimAngle, weapon);
+      } else if (res?.kind === 'empty' && justPressed) {
+        this.hud.showToast('Sem munição! Digite BANGBANG ou troque de arma (1–4).', 2600);
+      }
+    }
+
+    if (this.bullets.length > 0) {
+      const peds = this.trafficManager?.pedestrians || [];
+      const impacts = stepBullets(this.bullets, dt, {
+        hitsWall: (x, y) => this.cityMap.getCollidersAround(x, y, 4).some((c) => x >= c.x && x <= c.x + c.w && y >= c.y && y <= c.y + c.h),
+        hitVehicle: (x, y) => this.vehicles.find((v) => !v.destroyed && v.id !== this.player.inVehicleId
+          && Math.abs(v.x - x) < 40 && Math.abs(v.y - y) < 40 && isTouchingVehicle(x, y, 1.5, v, 0)) || null,
+        hitPedestrian: (x, y) => peds.find((p) => p.state !== 'downed' && Math.abs(p.x - x) < 14 && Math.abs(p.y - y) < 14
+          && Math.hypot(p.x - x, p.y - y) < (p.radius || 9)) || null,
+      });
+      for (const imp of impacts) {
+        this.weaponFx.push({ kind: imp.type === 'ped' ? 'hit' : 'spark', x: imp.x, y: imp.y, angle: 0, life: 0, maxLife: 0.25 });
+        if (imp.type === 'vehicle') {
+          const v = imp.target;
+          v.health = Math.max(0, (v.health ?? 100) - imp.damage * 0.55);
+          if (v.health <= 0) this.#triggerVehicleExplosion(v);
+        } else if (imp.type === 'ped') {
+          const ang = Math.atan2(imp.y - this.player.y, imp.x - this.player.x);
+          applyPedestrianDamage(imp.target, imp.damage * 1.6, Math.cos(ang) * 120, Math.sin(ang) * 120);
+        }
+      }
+    }
+
+    for (let i = this.weaponFx.length - 1; i >= 0; i--) {
+      const fx = this.weaponFx[i];
+      fx.life += dt;
+      if (fx.life >= fx.maxLife) this.weaponFx.splice(i, 1);
+    }
+  }
+
+  #doMelee(angle, weapon) {
+    const fx = this.player.x + Math.cos(angle) * 16;
+    const fy = this.player.y + Math.sin(angle) * 16;
+    for (const ped of this.trafficManager?.pedestrians || []) {
+      if (ped.state === 'downed' || Math.hypot(ped.x - fx, ped.y - fy) > weapon.range) continue;
+      applyPedestrianDamage(ped, weapon.damage, Math.cos(angle) * 160, Math.sin(angle) * 160);
+      this.weaponFx.push({ kind: 'hit', x: ped.x, y: ped.y, angle, life: 0, maxLife: 0.2 });
+      break;
+    }
+  }
+
+  #panicPedestrians(x, y, radius) {
+    for (const ped of this.trafficManager?.pedestrians || []) {
+      if (ped.state === 'downed' || ped.state === 'fleeing') continue;
+      if (Math.abs(ped.x - x) > radius || Math.abs(ped.y - y) > radius) continue;
+      const dx = ped.x - x;
+      const dy = ped.y - y;
+      const d = Math.hypot(dx, dy) || 1;
+      if (d > radius) continue;
+      ped.state = 'fleeing';
+      ped.fleeTimer = 4;
+      ped.substate = null;
+      ped.crossTarget = null;
+      ped.waitingCrosswalk = null;
+      ped.targetBuilding = null;
+      ped.plazaTarget = null;
+      ped.returnTarget = null;
+      ped.dirX = dx / d;
+      ped.dirY = dy / d;
+      ped.angle = Math.atan2(ped.dirY, ped.dirX);
+    }
+  }
+
+  // ---- Códigos secretos ----
+  #activateCheat(cheat) {
+    const currentVehicle = this.player.inVehicleId
+      ? this.vehicles.find((v) => v.id === this.player.inVehicleId)
+      : null;
+    switch (cheat.id) {
+      case 'special-car':
+        this.#spawnSpecialCar();
+        break;
+      case 'turbo':
+        if (!currentVehicle) {
+          this.hud.showToast('Entre num veículo e digite TURBO de novo!', 3200);
+          return;
+        }
+        currentVehicle.profile = turboProfile(currentVehicle.profile || VEHICLE_PROFILES[currentVehicle.kind] || VEHICLE_PROFILES.car);
+        currentVehicle.turbo = true;
+        break;
+      case 'heal':
+        this.player.health = 100;
+        if (currentVehicle) currentVehicle.health = currentVehicle.special ? 200 : 100;
+        break;
+      case 'weapons':
+        this.weapons?.giveAll?.();
+        break;
+      case 'partner':
+        if (this.partner) {
+          this.partner.state = 'unplaced';
+        } else {
+          this.hud.showToast('Esta história não tem parceira.', 3000);
+          return;
+        }
+        break;
+      case 'night':
+        this.renderer.dayCycle.startHour = 22;
+        this.renderer.dayCycle.frozen = false;
+        this.renderer.dayCycle.offsetTime = this.elapsedTime;
+        break;
+      case 'day':
+        this.renderer.dayCycle.startHour = 10;
+        this.renderer.dayCycle.offsetTime = this.elapsedTime;
+        break;
+      default:
+        return;
+    }
+    this.hud.showToast(`🎮 Código ativado: ${cheat.label}`, 3600);
+    this.partnerSay('cheat', { force: true });
+  }
+
+  #spawnSpecialCar() {
+    const a = this.player.angle || 0;
+    const candidates = [
+      [Math.cos(a) * 60, Math.sin(a) * 60],
+      [-Math.sin(a) * 50, Math.cos(a) * 50],
+      [Math.sin(a) * 50, -Math.cos(a) * 50],
+      [-Math.cos(a) * 60, -Math.sin(a) * 60],
+    ];
+    let pos = { x: this.player.x + candidates[0][0], y: this.player.y + candidates[0][1] };
+    for (const [dx, dy] of candidates) {
+      const x = this.player.x + dx;
+      const y = this.player.y + dy;
+      const free = !this.cityMap.getCollidersAround(x, y, 40).some((c) => x > c.x - 26 && x < c.x + c.w + 26 && y > c.y - 26 && y < c.y + c.h + 26)
+        && !this.vehicles.some((v) => !v.destroyed && Math.hypot(v.x - x, v.y - y) < 50);
+      if (free) {
+        pos = { x, y };
+        break;
+      }
+    }
+    // Só um carro especial por vez
+    for (let i = this.vehicles.length - 1; i >= 0; i--) {
+      const v = this.vehicles[i];
+      if (v.special && v.id !== this.player.inVehicleId) this.vehicles.splice(i, 1);
+    }
+    const car = createVehicleEntity({
+      id: `especial-${Date.now()}`,
+      kind: 'car',
+      model: 'Ana Turbo',
+      color: '#ff3fa4',
+      x: pos.x,
+      y: pos.y,
+      angle: a,
+      isParked: true,
+    });
+    car.special = true;
+    car.profile = { ...SPECIAL_CAR_PROFILE };
+    car.length = SPECIAL_CAR_PROFILE.length;
+    car.health = 200;
+    this.vehicles.push(car);
+  }
+
+  // ---- Parceira (ex.: Camila acompanhando a Ana Laura) ----
+  #initPartner() {
+    this.partner = null;
+    this.partnerChatCooldown = 6;
+    this.partnerIdleTimer = 0;
+    this.lastPlayerVehicle = null;
+    const id = this.storyPackage?.partner;
+    const def = id && this.storyPackage?.characters?.get(id);
+    if (!def) return;
+    this.partner = createPartner(def);
+  }
+
+  /** Fala da parceira num balão (respeita intervalo mínimo, exceto se forçar). */
+  partnerSay(kind, { force = false } = {}) {
+    const p = this.partner;
+    if (!p || !p.visible && p.state !== 'riding') return;
+    if (!force && this.partnerChatCooldown > 0) return;
+    const line = pickLine(kind);
+    if (!line) return;
+    this.partnerChatCooldown = 7;
+    this.partnerIdleTimer = 0;
+    const pos = this.#worldToScreen(p.x, p.y - 22);
+    this.hud.showNpcSpeechBubble(p, line, pos);
+  }
+
+  #updatePartnerFollow(dt, currentVehicle) {
+    const p = this.partner;
+    if (!p) return;
+    if (currentVehicle) this.lastPlayerVehicle = currentVehicle;
+    // Enquanto a protagonista entra/sai do carro, a parceira espera
+    if (this.player.enteringVehicle || this.player.ejected?.active) return;
+    this.partnerChatCooldown = Math.max(0, this.partnerChatCooldown - dt);
+
+    const event = updatePartner(p, {
+      player: this.player,
+      playerVehicle: currentVehicle,
+      lastVehicle: this.lastPlayerVehicle,
+      dt,
+      resolve: (x, y, r) => resolvePedestrianEnvironmentCollisions(x, y, r, this.cityMap, this.vehicles),
+    });
+    if (event === 'boarded') this.partnerSay('boarded');
+    if (event === 'exited') this.partnerSay('exited');
+
+    if (currentVehicle) {
+      if (currentVehicle.isDrifting && currentVehicle.driftIntensity > 0.7 && currentVehicle.speed > 220) {
+        this.partnerSay('drift');
+      }
+      const h = currentVehicle.health ?? 100;
+      if (this.partnerLastVehicleHealth != null && h < this.partnerLastVehicleHealth - 6) {
+        this.partnerSay('crash');
+      }
+      this.partnerLastVehicleHealth = h;
+    } else {
+      this.partnerLastVehicleHealth = null;
+    }
+
+    this.partnerIdleTimer += dt;
+    if (this.partnerIdleTimer > 38) this.partnerSay('idle');
+  }
+
+  #updatePartnerNameplate() {
+    const p = this.partner;
+    if (!p || !p.visible || p.state === 'riding') return;
+    const pos = this.#worldToScreen(p.x, p.y - 32);
+    this.pendingPartnerNameplate = { text: p.name, x: pos.x, y: pos.y };
   }
 
   #updateNameplate(currentVehicle) {
@@ -2405,6 +2764,9 @@ export class Engine {
       pedestrians: this.trafficManager ? this.trafficManager.pedestrians : [],
       player: this.player,
       playerSprites: this.#getProtagonistSprites(),
+      partner: this.partner,
+      bullets: this.bullets,
+      weaponFx: this.weaponFx,
       skidMarks: this.skidMarks,
       bloodMarks: this.bloodMarks,
       smokeParticles: this.smokeParticles,

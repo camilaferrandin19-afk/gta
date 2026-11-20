@@ -5,10 +5,10 @@ start: CASA-001
 pickup: PRACA-001
 pickup_objective: Pegue a Caixa Secreta em [PRACA-001]
 target: COM-320
-objective: Leve a Caixa Secreta para Camila em [COM-320]
+objective: Leve a Caixa Secreta para Lucia em [COM-320]
 give_item: caixa-secreta
 require_item: caixa-secreta
-delivery_prompt: Camila quer guardar a Caixa Secreta em segurança em [COM-320]. Selecione o item:
+delivery_prompt: Lucia quer guardar a Caixa Secreta em segurança em [COM-320]. Selecione o item:
 wrong_item_message: Isso não é a Caixa Secreta! Olha direito!
 ---
 
@@ -23,16 +23,16 @@ bg: Frente da CASA-001
 - OPCAO: Vou lá buscar agora antes que vire repositório abandonado! -> NEXT
 - OPCAO: Se tiver bug dentro, a gente resolve no Vibe Coding! -> NEXT
 - OPCAO: Só espero que não seja uma caixa cheia de cabos VGA! -> NEXT
-- Jason: Haha! Pega a caixa na [PRACA-001] e leva direto para a Camila dentro de [COM-320], lá no Centro. Ela já preparou a bancada!
+- Jason: Haha! Pega a caixa na [PRACA-001] e leva direto para a Lucia dentro de [COM-320], lá no Centro. Ela já preparou a bancada!
 
 ## CUTSCENE_FIM
 left: ana-laura
-right: camila
+right: lucia
 bg: Interior do COM-320
 
-- Camila: Chegou bem na hora, Ana Laura! Trouxe a famosa Caixa Secreta sem bater em nenhum poste?
+- Lucia: Chegou bem na hora, Ana Laura! Trouxe a famosa Caixa Secreta sem bater em nenhum poste?
 - Ana Laura: Quase nenhum! Olha ela aqui, intacta e pesada igual projeto com mil dependências no node_modules:
 - ENTREGAR: caixa-secreta
-- Camila: Hmm... trancada a sete chaves! E só tem uma fechadura dourada bem no meio.
+- Lucia: Hmm... trancada a sete chaves! E só tem uma fechadura dourada bem no meio.
 - Ana Laura: E agora? Vamos pedir para uma IA adivinhar a senha?
-- Camila: Nem pensar, vai que ela alucina um número de 40 dígitos! Vou deixar a caixa guardada aqui no estúdio. Enquanto isso, corre porque o Jason está precisando de uma ajuda urgente com a placa de vídeo!
+- Lucia: Nem pensar, vai que ela alucina um número de 40 dígitos! Vou deixar a caixa guardada aqui no estúdio. Enquanto isso, corre porque o Jason está precisando de uma ajuda urgente com a placa de vídeo!

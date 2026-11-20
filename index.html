@@ -22,7 +22,7 @@
   <link rel="shortcut icon" href="./story/vibe-coding/favicon.svg">
   <link rel="apple-touch-icon" sizes="180x180" href="./icon-180.png">
   <title>Missão Vibe Coding — Curso em Vídeo</title>
-  <link rel="stylesheet" href="./styles/main.css?v=44">
+  <link rel="stylesheet" href="./styles/main.css?v=46">
 </head>
 <body>
   <div id="game-shell">
@@ -83,6 +83,10 @@
           </svg>
           <span id="location-code">---</span>
         </div>
+        <div id="weapon-badge" class="hud-pill weapon-badge hidden" aria-label="Arma atual">
+          <span id="weapon-name" class="weapon-name"></span>
+          <span id="weapon-ammo" class="weapon-ammo"></span>
+        </div>
       </div>
 
       <div id="hud-toast" class="hud-pill hud-toast hidden" role="status" aria-live="polite">
@@ -102,6 +106,7 @@
 
       <div id="context-prompt" class="context-prompt hidden" role="status" aria-live="polite"></div>
       <div id="player-nameplate" class="player-nameplate hidden" aria-hidden="true"></div>
+      <div id="partner-nameplate" class="player-nameplate partner-nameplate hidden" aria-hidden="true"></div>
 
       <div id="controls-hint" class="hud-pill">
         Setas/WASD: Andar · Espaço: Falar/Ação · F: Entrar no veículo · I/Tab: Inventário · M: Mapa
@@ -401,6 +406,6 @@
       });
     })();
   </script>
-  <script type="module" src="./src/main.js?v=83"></script>
+  <script type="module" src="./src/main.js?v=85"></script>
 </body>
 </html>

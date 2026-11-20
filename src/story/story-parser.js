@@ -133,6 +133,8 @@ export function parseStoryManifest(rawText, fileName = 'story.md') {
   const collectibles = parseStoryCollectiblesField(meta.collectibles, fileName);
   const encounters = parseListField(meta.encounters);
   const protagonist = String(meta.protagonist || '').trim();
+  // Opcional: personagem que acompanha a protagonista pela cidade
+  const partner = String(meta.partner || '').trim();
 
   return {
     title: meta.title,
@@ -140,6 +142,7 @@ export function parseStoryManifest(rawText, fileName = 'story.md') {
     subtitle: meta.subtitle || '',
     splash: validateAssetPath(meta.splash || '', fileName, 2),
     protagonist,
+    partner,
     characters,
     missions,
     items,

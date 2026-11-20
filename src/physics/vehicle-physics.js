@@ -117,7 +117,8 @@ export function updateVehicle(vehicle, input, dt, cityMap) {
     vehicle.driftIntensity = 0;
     return { collided: false, impactSpeed: 0 };
   }
-  const profile = VEHICLE_PROFILES[vehicle.kind] || VEHICLE_PROFILES.car;
+  // Perfil próprio (carro especial / turbo) tem prioridade sobre o do tipo
+  const profile = vehicle.profile || VEHICLE_PROFILES[vehicle.kind] || VEHICLE_PROFILES.car;
 
   if (vehicle.driver === 'player') {
     const prevCos = Math.cos(vehicle.angle);

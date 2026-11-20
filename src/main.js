@@ -1,5 +1,5 @@
-import { Engine } from './core/engine.js?v=62';
-import { HudController } from './ui/hud-controller.js?v=43';
+import { Engine } from './core/engine.js?v=65';
+import { HudController } from './ui/hud-controller.js?v=45';
 import { CutsceneController } from './ui/cutscene-controller.js?v=15';
 import { PauseMenuController } from './ui/pause-menu.js?v=6';
 import { StorySelectorController } from './ui/story-selector.js?v=1';
@@ -22,7 +22,7 @@ import {
   preloadMissionAssets,
   preloadStoryAssets,
   refreshAllStoryAssets
-} from './story/story-loader.js?v=28';
+} from './story/story-loader.js?v=29';
 
 function waitMs(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));

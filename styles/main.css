@@ -432,6 +432,41 @@ body {
   z-index: 4;
 }
 
+.partner-nameplate {
+  color: #86efac;
+}
+
+.weapon-badge {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  width: 136px;
+  box-sizing: border-box;
+}
+
+.weapon-name {
+  font-weight: 800;
+  font-size: 12px;
+  color: #fca5a5;
+  white-space: nowrap;
+}
+
+.weapon-ammo {
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  color: #e5e7eb;
+  white-space: nowrap;
+}
+
+.weapon-ammo.reloading {
+  color: #fbbf24;
+}
+
+@media (max-width: 600px) {
+  .weapon-badge { width: 112px; }
+}
+
 @media (max-width: 600px) {
   .protagonist-card { width: 112px; }
   .protagonist-avatar { width: 30px; height: 30px; flex-basis: 30px; }

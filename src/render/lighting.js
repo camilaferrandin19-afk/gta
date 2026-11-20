@@ -40,9 +40,10 @@ export function createDayCycle(search = (typeof window !== 'undefined' ? window.
     startHour,
     daySeconds,
     frozen,
+    offsetTime: 0, // permite "recomeçar" o relógio numa hora nova (códigos LUAR/SOLAR)
     hourAt(time) {
-      const t = frozen ? 0 : Math.max(0, time || 0);
-      return (startHour + (t / daySeconds) * 24) % 24;
+      const t = this.frozen ? 0 : Math.max(0, (time || 0) - this.offsetTime);
+      return (this.startHour + (t / this.daySeconds) * 24) % 24;
     },
     sample(time) {
       return computeSky(this.hourAt(time));

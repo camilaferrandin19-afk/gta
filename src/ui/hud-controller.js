@@ -1107,9 +1107,33 @@ export class HudController {
     card.classList.remove('hidden');
   }
 
+  /** Arma atual e munição; some quando só há os punhos. */
+  setWeaponStatus(s) {
+    if (!this.weaponBadgeEl) {
+      this.weaponBadgeEl = document.getElementById('weapon-badge');
+      this.weaponNameEl = document.getElementById('weapon-name');
+      this.weaponAmmoEl = document.getElementById('weapon-ammo');
+    }
+    if (!this.weaponBadgeEl || !s) return;
+    const show = s.armedCount > 0;
+    this.weaponBadgeEl.classList.toggle('hidden', !show);
+    const armedMode = show && !s.inVehicle;
+    if (this.controlsArmed !== armedMode) {
+      this.controlsArmed = armedMode;
+      this.controlsMode = '';
+    }
+    if (!show) return;
+    const name = s.name;
+    const ammo = s.melee ? '—' : s.reloading ? 'recarregando…' : `${s.mag} / ${s.reserve}`;
+    if (this.weaponNameEl.textContent !== name) this.weaponNameEl.textContent = name;
+    if (this.weaponAmmoEl.textContent !== ammo) this.weaponAmmoEl.textContent = ammo;
+    this.weaponAmmoEl.classList.toggle('reloading', Boolean(s.reloading));
+  }
+
   /** Nome flutuando sobre a personagem. plate = { text, x, y } ou null. */
-  setNameplate(plate) {
-    const el = this.nameplateEl || (this.nameplateEl = document.getElementById('player-nameplate'));
+  setNameplate(plate, elementId = 'player-nameplate') {
+    this.nameplateEls = this.nameplateEls || {};
+    const el = this.nameplateEls[elementId] || (this.nameplateEls[elementId] = document.getElementById(elementId));
     if (!el) return;
     if (!plate) {
       if (!el.classList.contains('hidden')) el.classList.add('hidden');
@@ -1161,7 +1185,16 @@ export class HudController {
     if (!this.controlsHintEl || mode === this.controlsMode) return;
     this.controlsMode = mode;
     const sairLabel = mode === 'moto' ? 'Descer da moto' : 'Sair do carro';
-    const groups = mode === 'foot'
+    const groups = mode === 'foot' && this.controlsArmed
+      ? [
+        [['WASD'], 'Andar'],
+        [['Clique', 'K'], 'Atirar'],
+        [['R'], 'Recarregar'],
+        [['1-4', 'G'], 'Trocar arma'],
+        [['F'], 'Entrar no veículo'],
+        [['+', '−'], 'Zoom'],
+      ]
+      : mode === 'foot'
       ? [
         [['WASD', 'Setas'], 'Andar'],
         [['Espaço'], 'Falar/Ação'],
