@@ -1,4 +1,5 @@
 import { createTextureAtlas } from './texture-atlas.js?v=17';
+import { createLightAtlas, createDayCycle } from './lighting.js?v=1';
 
 const VERTEX_SHADER = `
   attribute vec2 a_position;
@@ -73,6 +74,8 @@ export class WebGLRenderer {
     this.#initShaders();
     this.#initBuffers();
     this.#initAtlas();
+    this.#initLightAtlas();
+    this.dayCycle = createDayCycle();
 
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
@@ -145,6 +148,153 @@ export class WebGLRenderer {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, atlas.canvas);
     this.customTextures = new Map();
+  }
+
+  // Texturas de luz (brilho, facho de farol, vinheta) com filtro LINEAR para
+  // gradientes suaves mesmo esticados na tela inteira.
+  #initLightAtlas() {
+    const gl = this.gl;
+    const { canvas, uvs } = createLightAtlas();
+    this.lightUvs = uvs;
+    this.lightTexture = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, this.lightTexture);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, canvas);
+    gl.bindTexture(gl.TEXTURE_2D, this.texture);
+  }
+
+  // Passe de iluminação: escurece a cena conforme a hora do dia e soma as luzes
+  // (faróis, postes, portas acesas, fogo) com blend aditivo. Por fim, vinheta.
+  #renderLighting({ camera, cityMap, vehicles, boats, explosions, player, visibleBlocks, time }) {
+    const gl = this.gl;
+    const sky = this.dayCycle.sample(time);
+    const insideFactor = player.insideLocationCode ? 0.35 : 1;
+    const darkness = sky.darkness * insideFactor;
+    const lights = sky.lights;
+
+    const viewW = (this.viewWidth || 800) / this.zoom;
+    const viewH = (this.viewHeight || 600) / this.zoom;
+    const vx = camera.x - viewW * 0.5 - 4;
+    const vy = camera.y - viewH * 0.5 - 4;
+    const vw = viewW + 8;
+    const vh = viewH + 8;
+
+    const mainUvs = this.uvs;
+    this.uvs = this.lightUvs;
+    gl.bindTexture(gl.TEXTURE_2D, this.lightTexture);
+
+    const flush = () => {
+      if (this.quadCount === 0) return;
+      gl.bufferSubData(gl.ARRAY_BUFFER, 0, this.vertexData.subarray(0, this.quadCount * 6 * this.floatsPerVertex));
+      gl.drawArrays(gl.TRIANGLES, 0, this.quadCount * 6);
+      this.quadCount = 0;
+    };
+
+    // 1) Tom do céu: dourado no nascer/pôr do sol, azul-escuro à noite
+    this.quadCount = 0;
+    if (sky.golden > 0.01) {
+      this.#pushQuad(vx, vy, vw, vh, 0, 'solid', [1, 0.5, 0.18, 0.13 * sky.golden]);
+    }
+    if (darkness > 0.01) {
+      this.#pushQuad(vx, vy, vw, vh, 0, 'solid', [0.03, 0.05, 0.16, darkness]);
+    }
+    flush();
+
+    // 2) Luzes somadas (aditivo)
+    if (lights > 0.01) {
+      gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+      const inView = (x, y, m = 160) => x > vx - m && x < vx + vw + m && y > vy - m && y < vy + vh + m;
+      const glow = (x, y, size, rgb, a, tex = 'glow') => {
+        this.#pushQuad(x - size * 0.5, y - size * 0.5, size, size, 0, tex, [rgb[0], rgb[1], rgb[2], a * lights]);
+      };
+
+      // Postes nas esquinas dos quarteirões e luz das portas
+      const lamp = [1, 0.8, 0.48];
+      const seenLamps = new Set();
+      for (const block of visibleBlocks) {
+        const b = block.bounds;
+        const corners = [[b.x - 6, b.y - 6], [b.x + b.w + 6, b.y - 6], [b.x - 6, b.y + b.h + 6], [b.x + b.w + 6, b.y + b.h + 6]];
+        for (const [lx, ly] of corners) {
+          const key = `${Math.round(lx / 8)}:${Math.round(ly / 8)}`;
+          if (seenLamps.has(key) || !inView(lx, ly)) continue;
+          seenLamps.add(key);
+          const flicker = 0.94 + Math.sin(time * 3.1 + lx * 0.07 + ly * 0.11) * 0.03;
+          glow(lx, ly, 150, lamp, 0.34 * flicker);
+          glow(lx, ly, 18, [1, 0.95, 0.8], 0.9);
+        }
+        for (const building of block.buildings) {
+          const dm = building.doormat;
+          if (!dm) continue;
+          const dx = dm.x + dm.w * 0.5;
+          const dy = dm.y + dm.h * 0.5;
+          if (!inView(dx, dy)) continue;
+          glow(dx, dy, 70, [1, 0.72, 0.38], 0.32);
+        }
+      }
+
+      // Faróis (facho em cone) e lanternas traseiras
+      for (const v of vehicles) {
+        if (v.destroyed || (v.sinkProgress ?? 0) > 0.3 || !inView(v.x, v.y, 220)) continue;
+        const cos = Math.cos(v.angle);
+        const sin = Math.sin(v.angle);
+        const half = v.length * 0.5;
+        const beamLen = v.kind === 'moto' ? 120 : 165;
+        const beamW = v.kind === 'moto' ? 62 : 92;
+        const bcx = v.x + cos * (half + beamLen * 0.5 - 4);
+        const bcy = v.y + sin * (half + beamLen * 0.5 - 4);
+        this.#pushQuad(bcx - beamLen * 0.5, bcy - beamW * 0.5, beamLen, beamW, v.angle, 'beam', [1, 0.95, 0.78, 0.42 * lights]);
+        const spread = v.kind === 'moto' ? [0] : [-0.28, 0.28];
+        for (const s of spread) {
+          const hx = v.x + cos * half - sin * v.width * s;
+          const hy = v.y + sin * half + cos * v.width * s;
+          glow(hx, hy, 16, [1, 0.97, 0.85], 0.85);
+        }
+        if (v.kind !== 'moto') {
+          const braking = (v.speed ?? 0) < 8 ? 1.35 : 1;
+          for (const s of [-0.3, 0.3]) {
+            const tx = v.x - cos * half - sin * v.width * s;
+            const ty = v.y - sin * half + cos * v.width * s;
+            glow(tx, ty, 26, [1, 0.12, 0.08], 0.5 * braking);
+          }
+        }
+      }
+
+      for (const boat of boats) {
+        if (!inView(boat.x, boat.y)) continue;
+        glow(boat.x, boat.y, 46, [0.6, 0.85, 1], 0.4);
+      }
+
+      // Fogo e explosões iluminam os arredores
+      for (const v of vehicles) {
+        if (!(v.destroyed && v.burning) || !inView(v.x, v.y)) continue;
+        glow(v.x, v.y, 230 + Math.sin(time * 12 + v.x) * 18, [1, 0.42, 0.1], 0.55);
+      }
+      for (const ex of explosions) {
+        const p = Math.min(1, ex.timer / ex.duration);
+        glow(ex.x, ex.y, ex.radius * 5, [1, 0.6, 0.2], (1 - p) * 0.9);
+      }
+
+      // Halo discreto ao redor do jogador para não sumir no escuro
+      glow(player.x, player.y, 120, [0.85, 0.88, 1], 0.16);
+
+      flush();
+      gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    }
+
+    // 3) Vinheta cinematográfica (mais forte à noite)
+    this.#pushQuad(vx, vy, vw, vh, 0, 'vignette', [0, 0, 0.02, 0.38 + darkness * 0.3]);
+    flush();
+
+    this.uvs = mainUvs;
+    gl.bindTexture(gl.TEXTURE_2D, this.texture);
+  }
+
+  /** Estado atual do céu (para HUD/depuração). */
+  getSkyState(time) {
+    return this.dayCycle.sample(time);
   }
 
   #getOrLoadLogoTexture(url) {
@@ -1196,5 +1346,7 @@ export class WebGLRenderer {
       }
       gl.bindTexture(gl.TEXTURE_2D, this.texture);
     }
+
+    this.#renderLighting({ camera, cityMap, vehicles, boats, explosions, player, visibleBlocks, time });
   }
 }

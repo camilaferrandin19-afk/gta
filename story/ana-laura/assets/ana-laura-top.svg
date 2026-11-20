@@ -1,0 +1,38 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg xmlns="http://www.w3.org/2000/svg" width="768" height="1024" viewBox="0 0 96 128" fill="none">
+  <title>Ana Laura — top</title>
+  <desc>Vista de cima: cabelo castanho longo e ondulado, camiseta preta, mangas brancas, mochila cáqui. Frente para baixo (+y). Fundo transparente.</desc>
+  <defs>
+    <linearGradient id="al-top-shirt" x1="29" y1="54" x2="66" y2="85" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#3A3A40" /><stop offset=".5" stop-color="#1E1E23" /><stop offset="1" stop-color="#0E0E12" />
+    </linearGradient>
+    <radialGradient id="al-top-hair" cx="46" cy="55" r="18" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#A06A3C" /><stop offset=".55" stop-color="#7A4C28" /><stop offset="1" stop-color="#4E2F17" />
+    </radialGradient>
+    <linearGradient id="al-top-bag" x1="35" y1="44" x2="61" y2="58" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#857650" /><stop offset="1" stop-color="#5C5034" />
+    </linearGradient>
+  </defs>
+  <g id="mochila" stroke="#2E2818" stroke-width=".8" stroke-linejoin="round">
+    <rect x="31.5" y="39.5" width="33" height="17" rx="5.5" fill="url(#al-top-bag)" />
+    <path d="M33.5 44.5H62.5" stroke="#433A25" stroke-width=".7" />
+    <rect x="33" y="46" width="4" height="7" rx="1.2" fill="#6E6242" stroke="#3A321F" stroke-width=".5" />
+    <rect x="59" y="46" width="4" height="7" rx="1.2" fill="#6E6242" stroke="#3A321F" stroke-width=".5" />
+  </g>
+  <g id="camisa" stroke-linejoin="round">
+    <path d="M29 64Q29 54 39 52Q48 50 57 52Q67 54 67 64L66 74Q64 82 48 82Q32 82 30 74Z" fill="url(#al-top-shirt)" stroke="#09090C" stroke-width=".9" />
+    <ellipse cx="31.2" cy="66" rx="3.6" ry="6.2" fill="#EDEDEA" stroke="#A9A9A4" stroke-width=".6" />
+    <ellipse cx="64.8" cy="66" rx="3.6" ry="6.2" fill="#EDEDEA" stroke="#A9A9A4" stroke-width=".6" />
+    <path d="M35.5 61L36.5 74M60.5 61L59.5 74" stroke="#5A5032" stroke-width="2.2" stroke-linecap="round" />
+    <path d="M40 77Q48 80.5 56 77" stroke="#5E5E66" stroke-width=".7" stroke-linecap="round" opacity=".7" />
+  </g>
+  <g id="cabeca">
+    <path d="M42.5 70.5Q48 74.5 53.5 70.5L52.8 72.6Q48 75.6 43.2 72.6Z" fill="#F1C9A0" stroke="#C99872" stroke-width=".55" />
+    <path d="M47 74Q48 75.3 49 74" stroke="#C99872" stroke-width=".6" stroke-linecap="round" />
+    <path d="M33.5 60Q33 46 48 44.5Q63 46 62.5 60Q62.5 67.5 57 71Q52 68.6 48 69.3Q44 68.6 39 71Q33.5 67.5 33.5 60Z" fill="url(#al-top-hair)" stroke="#2E1B0C" stroke-width=".85" />
+    <path d="M36 57Q33 48 37 42Q39 38.5 41.6 40.2Q43.8 37.2 46.2 39.4Q48 37 49.8 39.4Q52.2 37.2 54.4 40.2Q57 38.5 59 42Q63 48 60 57Z" fill="url(#al-top-hair)" stroke="#2E1B0C" stroke-width=".85" stroke-linejoin="round" />
+    <path d="M48 46V68" stroke="#C69062" stroke-width=".9" stroke-linecap="round" opacity=".8" />
+    <path d="M37 55Q39.5 50 44 48M59 55Q56.5 50 52 48M36.5 62Q39 58 43.5 57M59.5 62Q57 58 52.5 57M40 42.5Q41 45.5 43 46.5M56 42.5Q55 45.5 53 46.5M46 41Q46.6 43.5 47.4 45M50 41Q49.4 43.5 48.6 45" stroke="#C08A58" stroke-width="1" stroke-linecap="round" opacity=".75" />
+    <path d="M40 66Q42 63.5 45 64M56 66Q54 63.5 51 64" stroke="#3A2210" stroke-width=".7" stroke-linecap="round" opacity=".7" />
+  </g>
+</svg>

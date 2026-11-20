@@ -1,0 +1,66 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg xmlns="http://www.w3.org/2000/svg" width="768" height="1024" viewBox="0 0 96 128" fill="none">
+  <title>Ana Laura — left</title>
+  <desc>Perfil olhando para a esquerda: cabelo castanho longo, camiseta preta, manga branca, mochila cáqui, calça cargo preta. Fundo transparente.</desc>
+  <defs>
+    <linearGradient id="al-l-skin" x1="34" y1="16" x2="61" y2="47" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFE6CC" /><stop offset=".6" stop-color="#F3CDA6" /><stop offset="1" stop-color="#E0AE84" />
+    </linearGradient>
+    <linearGradient id="al-l-hair" x1="34" y1="8" x2="66" y2="70" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#A36C3E" /><stop offset=".5" stop-color="#7A4C28" /><stop offset="1" stop-color="#4E2F17" />
+    </linearGradient>
+    <linearGradient id="al-l-shirt" x1="31" y1="52" x2="65" y2="91" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#3A3A40" /><stop offset=".5" stop-color="#1E1E23" /><stop offset="1" stop-color="#0E0E12" />
+    </linearGradient>
+    <linearGradient id="al-l-pants" x1="35" y1="91" x2="60" y2="116" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2E2E34" /><stop offset="1" stop-color="#121216" />
+    </linearGradient>
+    <linearGradient id="al-l-bag" x1="56" y1="52" x2="70" y2="84" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#857650" /><stop offset="1" stop-color="#5C5034" />
+    </linearGradient>
+  </defs>
+  <g id="mochila" stroke="#2E2818" stroke-width=".8" stroke-linejoin="round">
+    <path d="M57 54Q66 53 67.5 60L68 80Q67.5 86 60 86L57.5 85Z" fill="url(#al-l-bag)" />
+    <path d="M60 64H67M60.5 72H67.5" stroke="#433A25" stroke-width=".7" />
+    <rect x="61" y="74" width="5.5" height="7" rx="1.2" fill="#6E6242" stroke="#3A321F" stroke-width=".5" />
+  </g>
+  <g id="pernas" stroke="#141418" stroke-width=".7" stroke-linejoin="round">
+    <path d="M40 90H57L56 115H42Z" fill="url(#al-l-pants)" />
+    <path d="M46 99H52.5V106H46.3Z" fill="#232328" stroke="#0B0B0E" stroke-width=".55" />
+    <path d="M42 96L43 111" stroke="#4A4A52" opacity=".5" />
+    <path d="M41.8 112.5H56.2" stroke="#0B0B0E" />
+  </g>
+  <g id="tenis" stroke="#7F8590" stroke-width=".7" stroke-linejoin="round">
+    <path d="M42 114H55.8L56.5 120.4Q56.5 121.7 55 121.7H35Q33 121.7 33.3 119.7Q33.5 117.7 37 116.9Z" fill="#F3F2EE" />
+    <path d="M33.6 119H56" stroke="#B9C1CC" />
+  </g>
+  <g id="pescoco">
+    <path d="M42 43H52V53Q47 56 42 52Z" fill="url(#al-l-skin)" stroke="#C99872" stroke-width=".65" />
+  </g>
+  <g id="camisa" stroke-linejoin="round">
+    <path d="M42 50Q37 50.5 36 56Q34.6 66 35.8 84L36.2 88.6Q36.5 93.5 41 93.5H56Q60 93.5 60.2 89L60.5 66Q60.5 53 53 50Q48 54 42 50Z" fill="url(#al-l-shirt)" stroke="#09090C" stroke-width=".9" />
+    <path d="M44 55Q42 60 43 68L44.5 86Q45 89 47.5 89H50Q52 89 52 86L51.5 66Q51.5 58 49 55Z" fill="#EDEDEA" stroke="#A9A9A4" stroke-width=".7" />
+    <path d="M44.5 55Q49 53 52 56" stroke="#1E1E23" stroke-width="2.4" stroke-linecap="round" />
+    <path d="M53.5 51L56.5 66" stroke="#5A5032" stroke-width="2.2" stroke-linecap="round" />
+    <path d="M38 81L41 82" stroke="#5E5E66" stroke-opacity=".5" stroke-width=".6" />
+    <path d="M40.5 50.5Q39.5 54 41.5 56.5" stroke="#E2B347" stroke-width=".55" />
+  </g>
+  <g id="cabelo-tras">
+    <path d="M50 14Q64 12 65.5 26Q67 40 64.5 52Q63 60 57.5 64Q59 56 56.5 50Q53 44 52 34Z" fill="url(#al-l-hair)" stroke="#2E1B0C" stroke-width=".85" stroke-linejoin="round" />
+  </g>
+  <g id="rosto">
+    <path d="M32 25Q31 13 47 13Q60 13 61.5 26Q62 41 51.5 47Q45 50.5 38.5 44.5L35.6 40L32 38.3Q30.5 37.8 31.8 35.2L33.6 31Q31.8 28.5 32 25Z" fill="url(#al-l-skin)" stroke="#C99872" stroke-width=".8" />
+    <ellipse cx="40" cy="36" rx="3" ry="1.6" fill="#F0A090" opacity=".4" />
+    <path d="M33.2 27.6Q36 26.4 39 27.6" stroke="#5A3A20" stroke-width="1" stroke-linecap="round" />
+    <ellipse cx="35.9" cy="31.1" rx="1.8" ry="2.6" fill="#3B2414" />
+    <circle cx="35.3" cy="30.3" r=".65" fill="white" />
+    <path d="M37.4 28.7L38.4 27.9" stroke="#2A1A0E" stroke-width=".6" stroke-linecap="round" />
+    <path d="M34.8 35.2L33.3 36.8L35.5 37.1" stroke="#C99872" stroke-width=".7" stroke-linecap="round" />
+    <path d="M35.8 40.2Q39.5 42.6 43.2 40.1" stroke="#B85E55" stroke-width=".9" stroke-linecap="round" />
+  </g>
+  <g id="cabelo" stroke-linejoin="round">
+    <path d="M32.3 27Q29 18 35.5 12.5Q42 8 50 9.5Q60 10.5 62.5 20Q64 28 60 34Q57.5 40 59 46Q55 42 54.5 36Q52.5 30 53 24Q48 22 44 18Q40 22 34 23Z" fill="url(#al-l-hair)" stroke="#2E1B0C" stroke-width=".85" />
+    <ellipse cx="51.8" cy="31.5" rx="2.8" ry="3.8" fill="#E9BE96" stroke="#C99872" stroke-width=".6" />
+    <path d="M36 15.5Q42 11.5 48 12.5M50 13Q57 13 60 19M55 26Q58 32 57 40M62 30Q63.5 40 61.5 50" stroke="#C08A58" stroke-width=".9" stroke-linecap="round" opacity=".7" />
+  </g>
+</svg>
