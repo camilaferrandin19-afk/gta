@@ -3,7 +3,7 @@ import { RoadPathfinder } from '../world/pathfinding.js';
 import { TrafficManager } from '../world/traffic-manager.js?v=24';
 import { BoatManager } from '../world/boat-manager.js?v=17';
 import { InputManager } from '../input/input-manager.js?v=21';
-import { WebGLRenderer } from '../render/webgl-renderer.js?v=36';
+import { WebGLRenderer } from '../render/webgl-renderer.js?v=37';
 import { isInWater, resolveCircleStaticObstacle, resolveEntityCollisions, resolveVehiclePairCollision } from '../physics/collision.js?v=11';
 import {
   applyPedestrianDamage,
@@ -29,11 +29,21 @@ import { Minimap } from '../ui/minimap.js?v=27';
 import { Inventory } from './inventory.js?v=20';
 import { createSaveSnapshot, saveGameState } from './save-state.js?v=2';
 import { getPendingMissionAssetUrls, preloadMissionAssets } from '../story/story-loader.js';
-import { createPartner, pickLine, updatePartner } from '../world/partner.js?v=1';
-import { createCheatBuffer, SPECIAL_CAR_PROFILE, turboProfile } from './cheats.js?v=1';
+import { createPartner, pickLine, updatePartner } from '../world/partner.js?v=2';
+import { createCheatBuffer, SPECIAL_CAR_PROFILE, turboProfile } from './cheats.js?v=2';
 import {
-  createArsenal, cycleWeapon, giveAllWeapons, selectWeapon, startReload, stepBullets, tickArsenal, tryFire, WEAPONS, WEAPON_ORDER,
+  createArsenal, cycleWeapon, giveAllWeapons, giveWeapon, selectWeapon, startReload, stepBullets, tickArsenal, tryFire, WEAPONS, WEAPON_ORDER,
 } from './weapons.js?v=1';
+import {
+  addMoney, collectibleReward, comboActive, createWallet, GARAGE_SHOP, GUN_SHOP, missionReward, multiplierFor, PAINT_COLORS, REWARDS, spend, tickCombo,
+} from './economy.js?v=1';
+
+// Logos dos telhados das lojas (SVG embutido)
+const svgData = (svg) => `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+const SHOP_LOGOS = {
+  gun: svgData('<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 64 64"><circle cx="32" cy="32" r="29" fill="#fff" stroke="#111" stroke-width="3"/><path d="M12 26h30l4-4h6v10H40l-3 3h-7l-2 9h-8l2-9h-10z" fill="#111"/><circle cx="32" cy="32" r="22" fill="none" stroke="#b91c1c" stroke-width="3" stroke-dasharray="4 5"/></svg>'),
+  garage: svgData('<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 64 64"><circle cx="32" cy="32" r="29" fill="#fff" stroke="#111" stroke-width="3"/><path d="M41 14a10 10 0 0 0-9 13L15 44l5 5 17-17a10 10 0 0 0 13-9l-6 4-5-2-2-5z" fill="#1d4ed8" stroke="#111" stroke-width="2" stroke-linejoin="round"/></svg>'),
+};
 
 const PEDESTRIAN_CHAT_LINES = [
   'Opa! Cuidado com o trânsito por aqui!',
@@ -65,6 +75,11 @@ export class Engine {
     this.#initPartner();
     this.cheatBuffer = createCheatBuffer();
     this.#initWeapons(canvas);
+    this.#initEconomy();
+    // Modo de depuração: ?debug=1 expõe o motor no console (window.gta)
+    try {
+      if (new URLSearchParams(window.location.search).get('debug') === '1') window.gta = this;
+    } catch { /* sem window */ }
     this.cutscene = options.cutscene || null;
     this.pauseMenu = options.pauseMenu || null;
     this.inventoryController = options.inventoryController || null;
@@ -165,6 +180,7 @@ export class Engine {
 
     this.#onKeyDown = (e) => {
       if (!this.running || this.player.isDead || this.deathSequence || this.hud.isMissionCompleteOpen()) return;
+      if (this.shopOpen) return; // a loja trata o próprio teclado
       if (e.key === 'Escape' && this.hud.isExpandedMapOpen()) {
         this.closeExpandedMap();
         return;
@@ -281,6 +297,7 @@ export class Engine {
       },
     });
     saveGameState(snapshot);
+    this.#saveEconomy();
   }
 
   applyRefreshedStoryPackage(freshPackage) {
@@ -844,6 +861,7 @@ export class Engine {
         });
       }
     }
+    this.#setupShops();
     const encounters = this.storyPackage?.encounters;
     if (!Array.isArray(encounters) || encounters.length === 0) return;
     for (const encounter of encounters) {
@@ -1023,6 +1041,7 @@ export class Engine {
         }
       }
       this.setObjective(null);
+      this.#payMissionReward(this.currentMissionIndex, mission);
       const hasNext = this.currentMissionIndex + 1 < this.storyPackage.missions.length;
       this.paused = true;
       this.hud.showMissionComplete(mission.title, hasNext, () => {
@@ -1316,6 +1335,8 @@ export class Engine {
       return;
     }
 
+    if (this.shopOpen) return;
+
     this.#updateCameraZoom(input, dt);
 
     if (this.player.isDead) {
@@ -1548,6 +1569,10 @@ export class Engine {
                 this.triggerGameOver(result.reason || 'Fim de linha!');
               }
             });
+            return;
+          }
+          if (this.#nearShop('gun', 50)) {
+            this.#openGunShop();
             return;
           }
           const nearest = findNearestVehicle(this.player.x, this.player.y, this.vehicles);
@@ -2026,6 +2051,7 @@ export class Engine {
         c.collected = true;
         this.collectedExtraIds.add(c.id);
         this.#grantMissionItem(c.id, { category: 'extra', rarity: c.rarity || 'normal' });
+        this.#earn(collectibleReward(c.rarity || 'normal'), 'Item encontrado');
         const screenPos = this.#worldToScreen(c.x, c.y);
         this.hud.animatePickupToInventory(screenPos.x, screenPos.y, c.imageUrl, c.name);
         this.hud.showToast(`${c.name} — ${c.description}`, {
@@ -2154,6 +2180,7 @@ export class Engine {
 
     this.#updatePartnerFollow(dt, currentVehicle);
     this.#updateWeapons(dt, currentVehicle);
+    this.#updateEconomy(dt, currentVehicle);
     {
       const ars = this.weapons.arsenal;
       const w = WEAPONS[ars.current];
@@ -2346,6 +2373,239 @@ export class Engine {
     }
   }
 
+  // ---- Dinheiro, combos e lojas ----
+  #economyKey(suffix) {
+    return `gta-${suffix}-${this.storyKey || 'default'}`;
+  }
+
+  #initEconomy() {
+    let saved = null;
+    try { saved = JSON.parse(localStorage.getItem(this.#economyKey('economia')) || 'null'); } catch { saved = null; }
+    this.wallet = createWallet(saved?.money || 0);
+    this.paidMissions = new Set(Array.isArray(saved?.paidMissions) ? saved.paidMissions : []);
+    const ars = this.weapons.arsenal;
+    if (saved?.weapons) {
+      for (const id of saved.weapons.owned || []) {
+        if (!WEAPONS[id]) continue;
+        ars.owned.add(id);
+        if (!WEAPONS[id].melee) {
+          ars.mag[id] = Math.min(WEAPONS[id].magSize, saved.weapons.mag?.[id] ?? WEAPONS[id].magSize);
+          ars.reserve[id] = Math.max(0, saved.weapons.reserve?.[id] ?? 0);
+        }
+      }
+      if (ars.owned.has(saved.weapons.current)) ars.current = saved.weapons.current;
+    }
+    this.nearMissCooldowns = new Map();
+    this.ecoLastVehicleHealth = null;
+    this.shopOpen = false;
+    this.shops = [];
+    this.garageArmed = true;
+  }
+
+  #saveEconomy() {
+    const ars = this.weapons.arsenal;
+    const data = {
+      money: this.wallet.money,
+      paidMissions: [...this.paidMissions],
+      weapons: { owned: [...ars.owned], current: ars.current, mag: ars.mag, reserve: ars.reserve },
+    };
+    try { localStorage.setItem(this.#economyKey('economia'), JSON.stringify(data)); } catch { /* sem storage */ }
+  }
+
+  #earn(amount, label) {
+    const v = addMoney(this.wallet, amount);
+    if (v > 0) this.hud.showMoneyGain?.(v, label);
+    this.#saveEconomy();
+  }
+
+  #payMissionReward(index, mission) {
+    const key = mission?.id || String(index);
+    if (this.paidMissions.has(key)) return;
+    this.paidMissions.add(key);
+    this.#earn(missionReward(index), 'Missão cumprida');
+  }
+
+  #countNearMisses(v) {
+    let count = 0;
+    const now = this.elapsedTime;
+    for (const [id, until] of this.nearMissCooldowns) {
+      if (until < now) this.nearMissCooldowns.delete(id);
+    }
+    if ((v.speed || 0) < 230) return 0;
+    for (const o of this.vehicles) {
+      if (o === v || o.destroyed || this.nearMissCooldowns.has(o.id)) continue;
+      const dx = o.x - v.x;
+      const dy = o.y - v.y;
+      if (Math.abs(dx) > 70 || Math.abs(dy) > 70) continue;
+      const gap = Math.hypot(dx, dy) - (v.radius || 17) - (o.radius || 17);
+      if (gap > 0 && gap < 11) {
+        this.nearMissCooldowns.set(o.id, now + 2.5);
+        count += 1;
+      }
+    }
+    return count;
+  }
+
+  #updateEconomy(dt, currentVehicle) {
+    let crashed = false;
+    let nearMisses = 0;
+    if (currentVehicle) {
+      const h = currentVehicle.health ?? 100;
+      if (this.ecoLastVehicleHealth != null && h < this.ecoLastVehicleHealth - 2) crashed = true;
+      this.ecoLastVehicleHealth = h;
+      if (!crashed) nearMisses = this.#countNearMisses(currentVehicle);
+    } else {
+      this.ecoLastVehicleHealth = null;
+    }
+    const events = tickCombo(this.wallet, dt, {
+      drifting: Boolean(currentVehicle?.isDrifting),
+      driftIntensity: currentVehicle?.driftIntensity || 0,
+      speed: currentVehicle?.speed || 0,
+      crashed,
+      nearMisses,
+    });
+    for (const ev of events) {
+      if (ev.type === 'stunt') this.hud.flashComboStunt?.(ev.label, ev.mult);
+      if (ev.type === 'bank') {
+        this.hud.showMoneyGain?.(ev.amount, ev.mult > 1 ? `Combo x${ev.mult}` : 'Manobra');
+        this.#saveEconomy();
+      }
+      if (ev.type === 'lost') this.hud.showComboLost?.(ev.amount);
+    }
+    this.hud.setCombo?.({
+      active: comboActive(this.wallet),
+      mult: multiplierFor(this.wallet.chain),
+      pending: this.wallet.pending,
+      label: this.wallet.lastStunt,
+      timer: this.wallet.timer,
+    });
+    this.hud.setMoney?.(this.wallet.money);
+  }
+
+  /** Escolhe prédios comerciais livres perto do início para a loja de armas e a oficina. */
+  #setupShops() {
+    this.shops = [];
+    if (!this.cityMap?.locationsByCode) return;
+    const used = new Set();
+    for (const m of this.storyPackage?.missions || []) {
+      for (const c of [m.startLocation, m.pickupLocation, m.targetLocation]) if (c) used.add(String(c).toUpperCase());
+    }
+    for (const e of this.storyPackage?.encounters || []) if (e.location) used.add(String(e.location).toUpperCase());
+    for (const it of this.storyPackage?.extraItems || []) if (it.location) used.add(String(it.location).toUpperCase());
+    for (const code of this.storyPackage?.mapRoofs?.keys?.() || []) used.add(code);
+
+    let origin = { x: this.cityMap.worldWidth * 0.5, y: this.cityMap.worldHeight * 0.5 };
+    try {
+      const startCode = this.storyPackage?.missions?.[0]?.startLocation;
+      if (startCode) origin = this.cityMap.resolveLocationCode(startCode).spawnPoint || origin;
+    } catch { /* mantém o centro */ }
+
+    const candidates = [];
+    for (const [code, loc] of this.cityMap.locationsByCode) {
+      if (loc?.type !== 'commerce' || used.has(code) || !loc.spawnPoint) continue;
+      candidates.push({ code, loc, d: Math.hypot(loc.spawnPoint.x - origin.x, loc.spawnPoint.y - origin.y) });
+    }
+    candidates.sort((a, b) => a.d - b.d);
+    const gun = candidates[0];
+    const garage = candidates.find((c) => gun && Math.hypot(c.loc.spawnPoint.x - gun.loc.spawnPoint.x, c.loc.spawnPoint.y - gun.loc.spawnPoint.y) > 350);
+    if (gun) {
+      this.shops.push({ kind: 'gun', code: gun.code, name: 'Loja de Armas', point: gun.loc.spawnPoint });
+      this.encounterLocationCodes.set(gun.code, { roofColor: '#b91c1c', roofLogo: SHOP_LOGOS.gun });
+    }
+    if (garage) {
+      this.shops.push({ kind: 'garage', code: garage.code, name: 'Oficina', point: garage.loc.spawnPoint });
+      this.encounterLocationCodes.set(garage.code, { roofColor: '#1d4ed8', roofLogo: SHOP_LOGOS.garage });
+    }
+    // No HUD e no mapa, o prédio passa a se chamar pelo nome da loja
+    if (this.shops.length > 0) {
+      this.locationNames = new Map(this.locationNames || []);
+      for (const s of this.shops) this.locationNames.set(s.code, s.name);
+    }
+  }
+
+  /** Depuração: leva a protagonista até a porta de uma loja ('gun' | 'garage'). */
+  debugGoToShop(kind = 'gun') {
+    const s = this.shops.find((x) => x.kind === kind);
+    if (!s) return null;
+    this.player.x = s.point.x;
+    this.player.y = s.point.y + 6;
+    if (this.partner) this.partner.state = 'unplaced';
+    return { code: s.code, name: this.getLocationDisplayName(s.code) };
+  }
+
+  #nearShop(kind, radius) {
+    return this.shops.find((s) => s.kind === kind && Math.hypot(this.player.x - s.point.x, this.player.y - s.point.y) < radius) || null;
+  }
+
+  #openGunShop() {
+    const ars = this.weapons.arsenal;
+    const items = () => GUN_SHOP.map((it) => ({
+      ...it,
+      note: it.kind === 'weapon' && ars.owned.has(it.id) ? 'Você já tem (compra munição)' : '',
+      disabled: it.kind === 'ammo' && !ars.owned.has(it.weapon),
+    }));
+    this.#openShop('🔫 Loja de Armas', 'Compre armas e munição', items, (it) => {
+      if (it.kind === 'ammo' && !ars.owned.has(it.weapon)) return 'Compre a arma primeiro!';
+      if (!spend(this.wallet, it.price)) return 'Dinheiro insuficiente.';
+      if (it.kind === 'weapon') {
+        giveWeapon(ars, it.id, it.ammo);
+        selectWeapon(ars, it.id);
+      } else if (it.kind === 'ammo') {
+        ars.reserve[it.weapon] = (ars.reserve[it.weapon] || 0) + it.ammo;
+      } else if (it.kind === 'heal') {
+        this.player.health = 100;
+      }
+      return null;
+    });
+  }
+
+  #openGarage(vehicle) {
+    const items = () => GARAGE_SHOP.map((it) => ({
+      ...it,
+      note: (it.kind === 'turbo' && vehicle.turbo) || (it.kind === 'neon' && (vehicle.neon || vehicle.special)) ? 'Já instalado' : '',
+      disabled: (it.kind === 'turbo' && vehicle.turbo) || (it.kind === 'neon' && (vehicle.neon || vehicle.special))
+        || (it.kind === 'repair' && (vehicle.health ?? 100) >= (vehicle.special ? 200 : 100)),
+    }));
+    this.#openShop('🔧 Oficina', `Serviços para o seu ${vehicle.kind === 'moto' ? 'moto' : vehicle.kind === 'van' ? 'van' : 'carro'}`, items, (it) => {
+      if (!spend(this.wallet, it.price)) return 'Dinheiro insuficiente.';
+      if (it.kind === 'repair') vehicle.health = vehicle.special ? 200 : 100;
+      if (it.kind === 'paint') {
+        const idx = PAINT_COLORS.indexOf(vehicle.color);
+        vehicle.color = PAINT_COLORS[(idx + 1) % PAINT_COLORS.length];
+      }
+      if (it.kind === 'neon') vehicle.neon = true;
+      if (it.kind === 'turbo') {
+        vehicle.profile = turboProfile(vehicle.profile || VEHICLE_PROFILES[vehicle.kind] || VEHICLE_PROFILES.car);
+        vehicle.turbo = true;
+      }
+      return null;
+    });
+  }
+
+  #openShop(title, subtitle, itemsFn, onBuy) {
+    if (this.shopOpen || !this.hud.openShop) return;
+    this.shopOpen = true;
+    this.player.speed = 0;
+    this.hud.openShop({
+      title,
+      subtitle,
+      getItems: itemsFn,
+      getMoney: () => this.wallet.money,
+      onBuy: (item) => {
+        const err = onBuy(item);
+        if (!err) {
+          this.#saveEconomy();
+          this.partnerSay('shop', { force: true });
+        }
+        return err;
+      },
+      onClose: () => {
+        this.shopOpen = false;
+        this.input.consumeExitTrigger?.();
+      },
+    });
+  }
+
   // ---- Códigos secretos ----
   #activateCheat(cheat) {
     const currentVehicle = this.player.inVehicleId
@@ -2377,6 +2637,9 @@ export class Engine {
           this.hud.showToast('Esta história não tem parceira.', 3000);
           return;
         }
+        break;
+      case 'money':
+        this.#earn(REWARDS.cheat, 'Código GRANA');
         break;
       case 'night':
         this.renderer.dayCycle.startHour = 22;
@@ -2548,6 +2811,20 @@ export class Engine {
     this.hud.setControlsMode?.(currentVehicle ? (currentVehicle.kind === 'moto' ? 'moto' : 'car') : 'foot');
 
     if (currentVehicle) {
+      // Oficina: basta parar o veículo na frente dela
+      const garage = this.shops.find((s) => s.kind === 'garage');
+      if (garage) {
+        const d = Math.hypot(currentVehicle.x - garage.point.x, currentVehicle.y - garage.point.y);
+        if (d > 130) this.garageArmed = true;
+        if (d < 85) {
+          const pos = this.#worldToScreen(garage.point.x, garage.point.y - 40);
+          this.pendingContextPrompt = { keys: [], text: '🔧 Pare aqui para entrar na Oficina', x: pos.x, y: pos.y };
+          if (this.garageArmed && Math.abs(currentVehicle.speed || 0) < 18) {
+            this.garageArmed = false;
+            this.#openGarage(currentVehicle);
+          }
+        }
+      }
       if (!this.drivingTipShown) {
         this.drivingTipShown = true;
         let jaViu = false;
@@ -2560,6 +2837,13 @@ export class Engine {
       return;
     }
     if (busy || this.#isNearInteriorStoryNpc() || this.#isNearPendingTargetNpc() || this.#findNearbyEncounterNpc()) return;
+
+    const gunShop = this.#nearShop('gun', 50);
+    if (gunShop) {
+      const pos = this.#worldToScreen(gunShop.point.x, gunShop.point.y - 30);
+      this.pendingContextPrompt = { keys: ['F', 'Espaço'], text: 'Entrar na Loja de Armas', x: pos.x, y: pos.y };
+      return;
+    }
 
     const nearest = findNearestVehicle(this.player.x, this.player.y, this.vehicles);
     if (!nearest) return;

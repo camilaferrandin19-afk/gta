@@ -263,7 +263,7 @@ export class WebGLRenderer {
       }
 
       for (const v of vehicles) {
-        if (!v.special || v.destroyed || !inView(v.x, v.y)) continue;
+        if (!(v.special || v.neon) || v.destroyed || !inView(v.x, v.y)) continue;
         this.#pushQuad(v.x - v.length, v.y - v.width * 1.3, v.length * 2, v.width * 2.6, v.angle, 'glow', [1, 0.25, 0.7, 0.6 * lights]);
       }
 
@@ -850,8 +850,8 @@ export class WebGLRenderer {
           this.#pushQuad(hx - 12, hy - 5, 24, 10, v.angle, 'circle', [1.0, 0.94, 0.55, entryPulse * 0.7]);
         }
       }
-      // Neon rosa embaixo do carro especial
-      if (v.special && !v.destroyed) {
+      // Neon rosa embaixo do carro especial (ou com neon da oficina)
+      if ((v.special || v.neon) && !v.destroyed) {
         const pulse = 0.85 + Math.sin(time * 4 + v.x * 0.01) * 0.15;
         const gl = dentLength * 1.7 * pulseScale;
         const gw = dentWidth * 2.3 * pulseScale;

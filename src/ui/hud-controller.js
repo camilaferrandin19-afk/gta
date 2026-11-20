@@ -1107,6 +1107,170 @@ export class HudController {
     card.classList.remove('hidden');
   }
 
+  // ---- Dinheiro, combos e lojas ----
+  #fmtMoney(v) {
+    const n = Math.max(0, Math.round(v || 0));
+    return `R$ ${n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.')}`;
+  }
+
+  setMoney(value) {
+    if (!this.moneyValueEl) {
+      this.moneyValueEl = document.getElementById('money-value');
+      this.moneyBadgeEl = document.getElementById('money-badge');
+    }
+    if (!this.moneyValueEl) return;
+    const txt = this.#fmtMoney(value);
+    if (this.moneyValueEl.textContent !== txt) {
+      this.moneyValueEl.textContent = txt;
+      if (this.lastMoneyValue != null && value > this.lastMoneyValue) {
+        this.moneyBadgeEl.classList.remove('bump');
+        void this.moneyBadgeEl.offsetWidth;
+        this.moneyBadgeEl.classList.add('bump');
+      }
+    }
+    this.lastMoneyValue = value;
+  }
+
+  #popup(html, lost = false) {
+    const layer = document.getElementById('money-popups');
+    if (!layer) return;
+    const el = document.createElement('div');
+    el.className = `money-popup${lost ? ' lost' : ''}`;
+    el.append(...html);
+    layer.appendChild(el);
+    setTimeout(() => el.remove(), 1900);
+  }
+
+  showMoneyGain(amount, label = '') {
+    const small = document.createElement('small');
+    small.textContent = label;
+    this.#popup([document.createTextNode(`+${this.#fmtMoney(amount)}`), small]);
+  }
+
+  showComboLost(amount) {
+    const small = document.createElement('small');
+    small.textContent = 'Bateu! Combo perdido';
+    this.#popup([document.createTextNode(`−${this.#fmtMoney(amount)}`), small], true);
+  }
+
+  flashComboStunt(label, mult) {
+    const m = document.getElementById('combo-mult');
+    if (!m) return;
+    m.classList.remove('pop');
+    void m.offsetWidth;
+    m.classList.add('pop');
+  }
+
+  setCombo({ active, mult, pending, label, timer }) {
+    if (!this.comboEl) {
+      this.comboEl = document.getElementById('combo-meter');
+      this.comboLabelEl = document.getElementById('combo-label');
+      this.comboMultEl = document.getElementById('combo-mult');
+      this.comboValueEl = document.getElementById('combo-value');
+      this.comboTimerEl = document.getElementById('combo-timer');
+    }
+    if (!this.comboEl) return;
+    this.comboEl.classList.toggle('hidden', !active);
+    if (!active) return;
+    const lbl = label || 'COMBO';
+    if (this.comboLabelEl.textContent !== lbl) this.comboLabelEl.textContent = lbl;
+    const mt = `x${mult}`;
+    if (this.comboMultEl.textContent !== mt) this.comboMultEl.textContent = mt;
+    this.comboValueEl.textContent = this.#fmtMoney(pending * mult);
+    this.comboTimerEl.style.transform = `scaleX(${Math.max(0, Math.min(1, (timer || 0) / 3.5))})`;
+  }
+
+  /**
+   * Abre a loja. opts = { title, subtitle, getItems() → [{id,name,desc,price,note,disabled}],
+   * getMoney() → number, onBuy(item) → mensagem de erro | null, onClose() }
+   */
+  openShop(opts) {
+    const modal = document.getElementById('shop-modal');
+    const list = document.getElementById('shop-list');
+    const msg = document.getElementById('shop-message');
+    const moneyEl = document.getElementById('shop-money');
+    const closeBtn = document.getElementById('shop-close');
+    if (!modal || !list) return;
+    document.getElementById('shop-title').textContent = opts.title;
+    document.getElementById('shop-subtitle').textContent = opts.subtitle || '';
+    msg.textContent = '';
+    let selected = 0;
+    let items = [];
+
+    const render = () => {
+      items = opts.getItems();
+      const money = opts.getMoney();
+      moneyEl.textContent = this.#fmtMoney(money);
+      this.setMoney(money);
+      list.replaceChildren(...items.map((it, i) => {
+        const li = document.createElement('li');
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = `shop-item${i === selected ? ' selected' : ''}`;
+        btn.setAttribute('aria-disabled', it.disabled ? 'true' : 'false');
+        const text = document.createElement('span');
+        text.className = 'shop-item-text';
+        const name = document.createElement('span');
+        name.className = 'shop-item-name';
+        name.textContent = `${i + 1}. ${it.name}`;
+        const desc = document.createElement('span');
+        desc.className = 'shop-item-desc';
+        desc.textContent = it.desc || '';
+        text.append(name, desc);
+        if (it.note) {
+          const note = document.createElement('span');
+          note.className = 'shop-item-note';
+          note.textContent = it.note;
+          text.append(note);
+        }
+        const price = document.createElement('span');
+        price.className = `shop-item-price${it.price > money ? ' too-expensive' : ''}`;
+        price.textContent = this.#fmtMoney(it.price);
+        btn.append(text, price);
+        btn.addEventListener('click', () => { selected = i; buy(); });
+        btn.addEventListener('mouseenter', () => { selected = i; highlight(); });
+        li.append(btn);
+        return li;
+      }));
+    };
+    const highlight = () => {
+      [...list.querySelectorAll('.shop-item')].forEach((b, i) => b.classList.toggle('selected', i === selected));
+      list.querySelectorAll('.shop-item')[selected]?.scrollIntoView({ block: 'nearest' });
+    };
+    const buy = () => {
+      const it = items[selected];
+      if (!it) return;
+      if (it.disabled) {
+        msg.textContent = it.note || 'Indisponível.';
+        return;
+      }
+      const err = opts.onBuy(it);
+      msg.textContent = err || `✔ Compra feita: ${it.name}`;
+      render();
+    };
+    const close = () => {
+      modal.classList.add('hidden');
+      window.removeEventListener('keydown', onKey, true);
+      closeBtn.removeEventListener('click', close);
+      opts.onClose?.();
+    };
+    const onKey = (e) => {
+      const k = e.key;
+      // A loja "engole" o teclado: nada chega ao jogo nem ao menu de pausa
+      e.stopImmediatePropagation();
+      if (e.repeat && (k === 'Enter' || k === ' ')) { e.preventDefault(); return; }
+      if (k === 'Escape' || k === 'Backspace') { e.preventDefault(); close(); return; }
+      if (k === 'ArrowDown' || k === 's' || k === 'S') { e.preventDefault(); selected = (selected + 1) % items.length; highlight(); return; }
+      if (k === 'ArrowUp' || k === 'w' || k === 'W') { e.preventDefault(); selected = (selected - 1 + items.length) % items.length; highlight(); return; }
+      if (k === 'Enter' || k === ' ') { e.preventDefault(); buy(); return; }
+      if (/^[1-9]$/.test(k) && Number(k) <= items.length) { e.preventDefault(); selected = Number(k) - 1; buy(); }
+    };
+    render();
+    modal.classList.remove('hidden');
+    window.addEventListener('keydown', onKey, true);
+    closeBtn.addEventListener('click', close);
+  }
+
   /** Arma atual e munição; some quando só há os punhos. */
   setWeaponStatus(s) {
     if (!this.weaponBadgeEl) {
@@ -1160,7 +1324,7 @@ export class HudController {
       return;
     }
     const touch = getUiInputMode() === 'touch';
-    const keys = touch ? ['Ação'] : prompt.keys;
+    const keys = !prompt.keys?.length ? [] : touch ? ['Ação'] : prompt.keys;
     const key = `${keys.join('|')}::${prompt.text}`;
     if (key !== this.contextPromptKey) {
       const parts = [];

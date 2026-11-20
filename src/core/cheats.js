@@ -8,6 +8,7 @@ export const CHEAT_CODES = [
   { code: 'CURA', id: 'heal', label: 'Vida cheia e carro consertado!' },
   { code: 'BANGBANG', id: 'weapons', label: 'Todas as armas!' },
   { code: 'AJUDA', id: 'partner', label: 'A Camila está a caminho!' },
+  { code: 'GRANA', id: 'money', label: '+R$ 5.000!' },
   { code: 'LUAR', id: 'night', label: 'Boa noite, cidade!' },
   { code: 'SOLAR', id: 'day', label: 'Bom dia, cidade!' },
 ];

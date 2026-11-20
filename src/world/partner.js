@@ -202,6 +202,11 @@ export const PARTNER_LINES = {
     'Abaixa! Abaixa!',
     'Isso vai dar polícia...',
   ],
+  shop: [
+    'Boa compra!',
+    'Gastou, hein? Valeu a pena.',
+    'Agora sim, equipadas!',
+  ],
   cheat: [
     'Como você sabia desse código?!',
     'Trapaceira! Adorei.',
