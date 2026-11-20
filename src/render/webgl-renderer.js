@@ -1,4 +1,4 @@
-import { createTextureAtlas } from './texture-atlas.js?v=17';
+import { createTextureAtlas } from './texture-atlas.js?v=18';
 import { createLightAtlas, createDayCycle } from './lighting.js?v=1';
 
 const VERTEX_SHADER = `
@@ -839,6 +839,12 @@ export class WebGLRenderer {
           this.#pushQuad(hx - 12, hy - 5, 24, 10, v.angle, 'circle', [1.0, 0.94, 0.55, entryPulse * 0.7]);
         }
       }
+      // Sombra suave projetada (luz vindo de cima-esquerda)
+      {
+        const shL = dentLength * 1.42 * pulseScale;
+        const shW = dentWidth * 1.48 * pulseScale;
+        this.#pushQuad(v.x + 3 - shL * 0.5, v.y + 5 - shW * 0.5, shL, shW, v.angle, 'softshadow', [0, 0, 0, 0.34 * (v.sinkAlpha ?? 1)]);
+      }
       this.#pushQuad(
         v.x - dentLength * 0.5 * pulseScale,
         v.y - dentWidth * 0.5 * pulseScale,
@@ -1102,8 +1108,13 @@ export class WebGLRenderer {
       const cos = Math.cos(player.angle);
       const sin = Math.sin(player.angle);
       const skinRgb = hexToRgb01(playerSprites?.skinColor);
-      const pantsRgb = [0.16, 0.23, 0.36];
-      const shoeRgb = [0.88, 0.91, 0.96];
+      const sleeveRgb = hexToRgb01(playerSprites?.sleeveColor, skinRgb);
+      const pantsRgb = hexToRgb01(playerSprites?.pantsColor, [0.16, 0.23, 0.36]);
+      const shoeRgb = hexToRgb01(playerSprites?.shoeColor, [0.88, 0.91, 0.96]);
+      // Sombra suave sob o personagem a pé
+      if (!ridingMoto && !(player.sinkProgress > 0)) {
+        this.#pushQuad(player.x + 3 - 21 * pScale, player.y + 5 - 21 * pScale, 42 * pScale, 42 * pScale, 0, 'softshadow', [0, 0, 0, 0.32 * pAlpha]);
+      }
       const drawLimb = (forwardOffset, sideOffset, w, h, color, rotOffset = 0, tex = 'solid') => {
         const lx = player.x + (cos * forwardOffset - sin * sideOffset) * pScale;
         const ly = player.y + (sin * forwardOffset + cos * sideOffset) * pScale;
@@ -1112,7 +1123,7 @@ export class WebGLRenderer {
       const drawArm = (fwd, side, rotOffset = 0) => {
         const aCos = Math.cos(rotOffset);
         const aSin = Math.sin(rotOffset);
-        drawLimb(fwd, side, 7.5, 4.4, skinRgb, rotOffset, 'disc');
+        drawLimb(fwd, side, 7.5, 4.4, sleeveRgb, rotOffset, 'disc');
         drawLimb(fwd + 3.6 * aCos, side + 3.6 * aSin, 4.8, 4.8, skinRgb, rotOffset, 'disc');
       };
       const drawLeg = (fwd, side, rotOffset = 0) => {

@@ -177,6 +177,10 @@ export function parseCharacterMarkdown(rawText, fileName = 'character.md') {
     profile: meta.profile || '',
     traits: meta.traits || '',
     skinColor: String(meta.skin_color || '#f1c27d').trim() || '#f1c27d',
+    // Opcionais: cores da roupa nos braços/pernas desenhados pelo motor
+    sleeveColor: String(meta.sleeve_color || '').trim(),
+    pantsColor: String(meta.pants_color || '').trim(),
+    shoeColor: String(meta.shoe_color || '').trim(),
     sprites: {
       top: validateAssetPath(meta.sprite_top || '', fileName, 2),
       front: validateAssetPath(meta.sprite_front || '', fileName, 2),

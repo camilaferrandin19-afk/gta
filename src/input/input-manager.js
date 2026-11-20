@@ -305,12 +305,13 @@ export class InputManager {
       this.keys.has('KeyZ') ||
       this.touchButtons.has('action');
 
-    let secondaryPressed =
+    const keyboardBrake =
       this.keys.has('ShiftLeft') ||
       this.keys.has('ShiftRight') ||
       this.keys.has('KeyX') ||
-      this.keys.has('Backspace') ||
-      this.touchButtons.has('secondary');
+      this.keys.has('Backspace');
+    const touchSecondary = this.touchButtons.has('secondary');
+    let secondaryPressed = keyboardBrake || touchSecondary;
 
     const gp = this.#readGamepad();
     if (Math.abs(gp.moveX) > 0) moveX = gp.moveX;
@@ -319,13 +320,26 @@ export class InputManager {
     secondaryPressed = secondaryPressed || gp.secondary;
     const pausePressed = Boolean(gp.pause);
 
+    // Teclas "de botão" (sem as setas): usadas no combo e no segurar-para-sair
+    const actionButtons = actionPressed;
+    const holdExitSource = touchSecondary || Boolean(gp.secondary);
+
+    // Dirigindo: ↑/W acelera e ↓/S freia/dá ré (além de Espaço e Shift)
+    if (this.drivingMode) {
+      const upKey = this.keys.has('ArrowUp') || this.keys.has('KeyW');
+      const downKey = this.keys.has('ArrowDown') || this.keys.has('KeyS');
+      if (upKey && !downKey) actionPressed = true;
+      if (downKey && !upKey) secondaryPressed = true;
+    }
+
     const len = Math.hypot(moveX, moveY);
     if (len > 1) {
       moveX /= len;
       moveY /= len;
     }
 
-    const exitPressed = this.touchButtons.has('exit') || gp.exit;
+    // F: entrar/sair do veículo (padrão dos jogos de mundo aberto)
+    const exitPressed = this.touchButtons.has('exit') || gp.exit || this.keys.has('KeyF');
     const exitJustPressed = exitPressed && !this.prevExit;
 
     const actionJustPressed = actionPressed && !this.prevAction;
@@ -333,10 +347,12 @@ export class InputManager {
     const pauseJustPressed = pausePressed && !this.prevPause;
     const mapTogglePressed = Boolean(gp.mapToggle);
     const mapToggleJustPressed = mapTogglePressed && !this.prevMapToggle;
-    const comboNow = actionPressed && secondaryPressed;
+    const comboNow = actionButtons && (keyboardBrake || holdExitSource);
     const comboExitJustPressed = comboNow && !this.prevCombo;
 
-    if (secondaryPressed && !actionPressed) {
+    // Segurar freio parado para sair só vale no toque/controle: no teclado,
+    // segurar Shift/↓ parado é dar ré (sair é com F).
+    if (holdExitSource && !actionPressed) {
       this.secondaryHeldTime += dt;
     } else {
       this.secondaryHeldTime = 0;

@@ -1,5 +1,6 @@
 import {
   bindHoverClearsKeyboardFocus,
+  getUiInputMode,
   isKeyboardUiMode,
   onUiInputModeChange,
   setUiInputMode,
@@ -45,6 +46,10 @@ export class HudController {
     this.errorScreen = document.getElementById('error-screen');
     this.errorMessage = document.getElementById('error-message');
 
+    this.contextPromptEl = document.getElementById('context-prompt');
+    this.contextPromptKey = '';
+    this.controlsHintEl = document.getElementById('controls-hint');
+    this.controlsMode = '';
     this.locationCodeEl = document.getElementById('location-code');
     this.vehicleStatusEl = document.getElementById('vehicle-status');
     this.objectiveHintEl = document.getElementById('objective-hint');
@@ -1073,6 +1078,80 @@ export class HudController {
     this.gameoverScreen.classList.add('hidden');
     this.errorMessage.textContent = String(message || 'Erro desconhecido.');
     this.errorScreen.classList.remove('hidden');
+  }
+
+  /**
+   * Balão flutuante com a tecla a apertar (ex.: "F Entrar no carro").
+   * prompt = { keys: ['F', 'Espaço'], text, x, y } em coordenadas de tela, ou null.
+   */
+  setContextPrompt(prompt) {
+    const el = this.contextPromptEl;
+    if (!el) return;
+    if (!prompt) {
+      if (this.contextPromptKey) {
+        el.classList.add('hidden');
+        this.contextPromptKey = '';
+      }
+      return;
+    }
+    const touch = getUiInputMode() === 'touch';
+    const keys = touch ? ['Ação'] : prompt.keys;
+    const key = `${keys.join('|')}::${prompt.text}`;
+    if (key !== this.contextPromptKey) {
+      const parts = [];
+      keys.forEach((k, i) => {
+        if (i > 0) parts.push(document.createTextNode(' ou '));
+        const kbd = document.createElement('span');
+        kbd.className = 'kbd';
+        kbd.textContent = k;
+        parts.push(kbd);
+      });
+      parts.push(document.createTextNode(` ${prompt.text}`));
+      el.replaceChildren(...parts);
+      el.classList.remove('hidden');
+      this.contextPromptKey = key;
+    }
+    el.style.left = `${Math.round(prompt.x)}px`;
+    el.style.top = `${Math.round(prompt.y)}px`;
+  }
+
+  /** Barra de controles no rodapé conforme o modo: 'foot' | 'car' | 'moto'. */
+  setControlsMode(mode) {
+    if (!this.controlsHintEl || mode === this.controlsMode) return;
+    this.controlsMode = mode;
+    const sairLabel = mode === 'moto' ? 'Descer da moto' : 'Sair do carro';
+    const groups = mode === 'foot'
+      ? [
+        [['WASD', 'Setas'], 'Andar'],
+        [['Espaço'], 'Falar/Ação'],
+        [['F'], 'Entrar no veículo'],
+        [['I'], 'Inventário'],
+        [['M'], 'Mapa'],
+      ]
+      : [
+        [['W', '↑', 'Espaço'], 'Acelerar'],
+        [['S', '↓', 'Shift'], 'Frear/Ré'],
+        [['A', 'D'], 'Virar'],
+        [['F'], sairLabel],
+        [['M'], 'Mapa'],
+      ];
+    const nodes = [];
+    groups.forEach(([keys, label], gi) => {
+      if (gi > 0) {
+        const sep = document.createElement('span');
+        sep.className = 'hint-sep';
+        sep.textContent = '·';
+        nodes.push(sep);
+      }
+      keys.forEach((k) => {
+        const kbd = document.createElement('span');
+        kbd.className = 'kbd';
+        kbd.textContent = k;
+        nodes.push(kbd);
+      });
+      nodes.push(document.createTextNode(` ${label}`));
+    });
+    this.controlsHintEl.replaceChildren(...nodes);
   }
 
   updateStatus({ locationCode, vehicle, isDrifting, objectiveCode, health = 100 }) {

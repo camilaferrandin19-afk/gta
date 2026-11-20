@@ -2,8 +2,8 @@ import { CityMap } from '../world/city-map.js?v=30';
 import { RoadPathfinder } from '../world/pathfinding.js';
 import { TrafficManager } from '../world/traffic-manager.js?v=24';
 import { BoatManager } from '../world/boat-manager.js?v=17';
-import { InputManager } from '../input/input-manager.js?v=20';
-import { WebGLRenderer } from '../render/webgl-renderer.js?v=33';
+import { InputManager } from '../input/input-manager.js?v=21';
+import { WebGLRenderer } from '../render/webgl-renderer.js?v=34';
 import { isInWater, resolveCircleStaticObstacle, resolveEntityCollisions, resolveVehiclePairCollision } from '../physics/collision.js?v=11';
 import {
   applyPedestrianDamage,
@@ -872,6 +872,9 @@ export class Engine {
     return {
       ...(protChar.sprites || {}),
       skinColor: protChar.skinColor || '#f1c27d',
+      sleeveColor: protChar.sleeveColor || '',
+      pantsColor: protChar.pantsColor || '',
+      shoeColor: protChar.shoeColor || '',
     };
   }
 
@@ -1209,7 +1212,10 @@ export class Engine {
       if (!this.running) return;
       const dt = Math.min(0.05, Math.max(0.001, (now - this.lastTimestamp) / 1000));
       this.lastTimestamp = now;
+      this.pendingContextPrompt = null;
       this.update(dt);
+      // Só a rota normal do update preenche o balão; pausa, cutscene, morte etc. o escondem
+      this.hud.setContextPrompt?.(this.pendingContextPrompt);
       this.render();
       requestAnimationFrame(tick);
     };
@@ -1497,8 +1503,10 @@ export class Engine {
         } else {
           this.player.walkPhase = 0;
         }
-        if (input.actionJustPressed && !this.#isNearInteriorStoryNpc() && !this.#isNearPendingTargetNpc()) {
-          const encounterNpc = this.#findNearbyEncounterNpc();
+        // Espaço: conversar/entrar · F: só entrar no veículo
+        const wantsAction = input.actionJustPressed || input.exitJustPressed;
+        if (wantsAction && !this.#isNearInteriorStoryNpc() && !this.#isNearPendingTargetNpc()) {
+          const encounterNpc = input.actionJustPressed ? this.#findNearbyEncounterNpc() : null;
           if (encounterNpc && this.cutscene) {
             this.player.speed = 0;
             this.cutscene.play(encounterNpc.cutscene, this.storyPackage.characters, (result) => {
@@ -1528,7 +1536,7 @@ export class Engine {
               duration: hadNpcDriver ? 0.34 : 0.24,
               hadNpcDriver,
             };
-          } else {
+          } else if (input.actionJustPressed) {
             const ped = this.#findNearestTalkablePedestrian(this.player.x, this.player.y);
             if (ped) {
               ped.angle = Math.atan2(this.player.y - ped.y, this.player.x - ped.x);
@@ -2109,6 +2117,39 @@ export class Engine {
       objectiveCode: objectiveHint,
       health: this.hudDisplayHealth
     });
+
+    this.#updateVehicleGuidance(currentVehicle);
+  }
+
+  // Dicas de controle: balão "F Entrar" perto de veículos, barra de controles
+  // conforme o modo e uma dica única na primeira vez que dirige.
+  #updateVehicleGuidance(currentVehicle) {
+    const busy = this.player.enteringVehicle || this.player.exitingVehicle
+      || this.player.ejected?.active || (this.player.knockdownTimer || 0) > 0
+      || this.player.isDead || this.inventoryController?.isOpen;
+
+    this.hud.setControlsMode?.(currentVehicle ? (currentVehicle.kind === 'moto' ? 'moto' : 'car') : 'foot');
+
+    if (currentVehicle) {
+      if (!this.drivingTipShown) {
+        this.drivingTipShown = true;
+        let jaViu = false;
+        try { jaViu = localStorage.getItem('gta-dica-dirigir') === '1'; } catch { /* sem storage */ }
+        if (!jaViu) {
+          this.hud.showToast('Dirigindo! W/↑ ou Espaço acelera · S/↓ ou Shift freia e dá ré · A/D vira · F sai', 6500);
+          try { localStorage.setItem('gta-dica-dirigir', '1'); } catch { /* sem storage */ }
+        }
+      }
+      return;
+    }
+    if (busy || this.#isNearInteriorStoryNpc() || this.#isNearPendingTargetNpc() || this.#findNearbyEncounterNpc()) return;
+
+    const nearest = findNearestVehicle(this.player.x, this.player.y, this.vehicles);
+    if (!nearest) return;
+    const nome = nearest.kind === 'moto' ? 'Subir na moto' : nearest.kind === 'van' ? 'Entrar na van' : 'Entrar no carro';
+    const acao = nearest.driver === 'npc' ? `${nome} (tomar do motorista)` : nome;
+    const pos = this.#worldToScreen(nearest.x, nearest.y - Math.max(nearest.length, nearest.width) * 0.5 - 6);
+    this.pendingContextPrompt = { keys: ['F', 'Espaço'], text: acao, x: pos.x, y: pos.y };
   }
 
   #updateParticles(dt) {
