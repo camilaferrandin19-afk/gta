@@ -166,6 +166,11 @@ export class CutsceneController {
     slotEl.classList.remove('hidden');
     nameEl.textContent = charDef.name;
     const src = charDef.sprites?.cutscene || charDef.sprites?.[facingView] || charDef.sprites?.front || '';
+    const reserva = charDef.sprites?.[facingView] || charDef.sprites?.front || '';
+    // Retrato ausente (ex.: imagem pessoal mantida só no PC local) → usa o sprite simples
+    imgEl.onerror = reserva && reserva !== src
+      ? () => { imgEl.onerror = null; imgEl.src = reserva; }
+      : null;
     if (src) {
       imgEl.src = src;
       imgEl.alt = charDef.name;

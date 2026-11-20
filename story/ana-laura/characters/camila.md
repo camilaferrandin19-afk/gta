@@ -8,5 +8,5 @@ sprite_top: assets/pers-mulher-top.svg
 sprite_front: assets/clara-front.svg
 sprite_left: assets/clara-left.svg
 sprite_right: assets/clara-right.svg
-sprite_cutscene: assets/camila.png
+sprite_cutscene: assets/retrato-camila.png
 ---

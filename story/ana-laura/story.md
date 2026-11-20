@@ -2,7 +2,7 @@
 title: GTA: Aventura da Ana Laura
 page_title: Aventura da Ana Laura
 subtitle: Cruzando a cidade para descobrir o segredo guardado em uma caixa secreta e lidando com GPUs, servidores e robôs!
-splash: splash/splash-start.png
+splash: splash/abertura-ana-laura.png
 protagonist: ana-laura
 characters: ana-laura, jason, camila, pundar, maltmon, kaue
 items: caixa-secreta, placa-video, servidor, peca-robo, chave-secreta, disquete, pente-memoria, conector-ethernet, cooler-rgb, bateria-robo, caderno-prompts, token-dourado, manual-regex, cracha-gafanhoto, caneca-cafe, oculos-vibe-coder, pendrive-criptografado
