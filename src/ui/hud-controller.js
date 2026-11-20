@@ -1080,6 +1080,47 @@ export class HudController {
     this.errorScreen.classList.remove('hidden');
   }
 
+  /** Cartão com retrato e nome da protagonista (retrato ausente → sprite de frente). */
+  setProtagonist({ name = '', portrait = '', fallback = '' } = {}) {
+    const card = document.getElementById('protagonist-card');
+    const img = document.getElementById('protagonist-avatar');
+    const nameEl = document.getElementById('protagonist-name');
+    if (!card || !img || !nameEl || !name) return;
+    nameEl.textContent = name;
+    img.alt = name;
+    const useSprite = () => {
+      img.onerror = null;
+      if (fallback) {
+        img.classList.add('is-sprite');
+        img.src = fallback;
+      } else {
+        img.classList.add('hidden');
+      }
+    };
+    if (portrait) {
+      img.onerror = useSprite;
+      img.classList.toggle('is-sprite', /\.svg(\?|$)/i.test(portrait));
+      img.src = portrait;
+    } else {
+      useSprite();
+    }
+    card.classList.remove('hidden');
+  }
+
+  /** Nome flutuando sobre a personagem. plate = { text, x, y } ou null. */
+  setNameplate(plate) {
+    const el = this.nameplateEl || (this.nameplateEl = document.getElementById('player-nameplate'));
+    if (!el) return;
+    if (!plate) {
+      if (!el.classList.contains('hidden')) el.classList.add('hidden');
+      return;
+    }
+    if (el.textContent !== plate.text) el.textContent = plate.text;
+    el.classList.remove('hidden');
+    el.style.left = `${Math.round(plate.x)}px`;
+    el.style.top = `${Math.round(plate.y)}px`;
+  }
+
   /**
    * Balão flutuante com a tecla a apertar (ex.: "F Entrar no carro").
    * prompt = { keys: ['F', 'Espaço'], text, x, y } em coordenadas de tela, ou null.
@@ -1127,6 +1168,7 @@ export class HudController {
         [['F'], 'Entrar no veículo'],
         [['I'], 'Inventário'],
         [['M'], 'Mapa'],
+        [['+', '−'], 'Zoom'],
       ]
       : [
         [['W', '↑', 'Espaço'], 'Acelerar'],
@@ -1134,6 +1176,7 @@ export class HudController {
         [['A', 'D'], 'Virar'],
         [['F'], sairLabel],
         [['M'], 'Mapa'],
+        [['+', '−'], 'Zoom'],
       ];
     const nodes = [];
     groups.forEach(([keys, label], gi) => {

@@ -379,6 +379,65 @@ body {
   opacity: 0.45;
 }
 
+.protagonist-card {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 136px;
+  box-sizing: border-box;
+  padding: 4px 10px 4px 4px;
+}
+
+.protagonist-avatar {
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  border-radius: 50%;
+  object-fit: cover;
+  object-position: 50% 11%;
+  background: linear-gradient(160deg, #f59e0b, #db2777);
+  border: 2px solid #fbbf24;
+}
+
+.protagonist-avatar.is-sprite {
+  object-fit: contain;
+  object-position: 50% 0%;
+}
+
+.protagonist-name {
+  font-size: 13px;
+  font-weight: 800;
+  color: #fde68a;
+  line-height: 1.1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.player-nameplate {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform: translate(-50%, -100%);
+  pointer-events: none;
+  white-space: nowrap;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(14, 16, 21, 0.62);
+  color: #fde68a;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+  z-index: 4;
+}
+
+@media (max-width: 600px) {
+  .protagonist-card { width: 112px; }
+  .protagonist-avatar { width: 30px; height: 30px; flex-basis: 30px; }
+  .protagonist-name { font-size: 11px; }
+}
+
 .context-prompt {
   position: absolute;
   left: 0;

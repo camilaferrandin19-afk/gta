@@ -22,7 +22,7 @@
   <link rel="shortcut icon" href="./story/vibe-coding/favicon.svg">
   <link rel="apple-touch-icon" sizes="180x180" href="./icon-180.png">
   <title>Missão Vibe Coding — Curso em Vídeo</title>
-  <link rel="stylesheet" href="./styles/main.css?v=43">
+  <link rel="stylesheet" href="./styles/main.css?v=44">
 </head>
 <body>
   <div id="game-shell">
@@ -34,6 +34,10 @@
 
     <div id="hud-layer" class="hidden" aria-live="polite">
       <div id="top-left-stack">
+        <div id="protagonist-card" class="hud-pill protagonist-card hidden">
+          <img id="protagonist-avatar" class="protagonist-avatar" alt="">
+          <span id="protagonist-name" class="protagonist-name"></span>
+        </div>
         <div id="top-bar">
           <div id="vehicle-badge" class="hud-pill">
             <span id="vehicle-status">A pé</span>
@@ -97,6 +101,7 @@
       </div>
 
       <div id="context-prompt" class="context-prompt hidden" role="status" aria-live="polite"></div>
+      <div id="player-nameplate" class="player-nameplate hidden" aria-hidden="true"></div>
 
       <div id="controls-hint" class="hud-pill">
         Setas/WASD: Andar · Espaço: Falar/Ação · F: Entrar no veículo · I/Tab: Inventário · M: Mapa
@@ -396,6 +401,6 @@
       });
     })();
   </script>
-  <script type="module" src="./src/main.js?v=82"></script>
+  <script type="module" src="./src/main.js?v=83"></script>
 </body>
 </html>

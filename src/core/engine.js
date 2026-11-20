@@ -53,6 +53,8 @@ export class Engine {
     this.storyPackage = options.storyPackage || null;
     this.storyKey = options.storyKey || this.storyPackage?.title || 'default';
     this.locationNames = this.storyPackage?.locationNames || new Map();
+    this.#initCameraZoom(canvas);
+    this.#initProtagonistHud();
     this.cutscene = options.cutscene || null;
     this.pauseMenu = options.pauseMenu || null;
     this.inventoryController = options.inventoryController || null;
@@ -1213,9 +1215,11 @@ export class Engine {
       const dt = Math.min(0.05, Math.max(0.001, (now - this.lastTimestamp) / 1000));
       this.lastTimestamp = now;
       this.pendingContextPrompt = null;
+      this.pendingNameplate = null;
       this.update(dt);
-      // Só a rota normal do update preenche o balão; pausa, cutscene, morte etc. o escondem
+      // Só a rota normal do update preenche o balão/nome; pausa, cutscene, morte etc. os escondem
       this.hud.setContextPrompt?.(this.pendingContextPrompt);
+      this.hud.setNameplate?.(this.pendingNameplate);
       this.render();
       requestAnimationFrame(tick);
     };
@@ -1283,6 +1287,8 @@ export class Engine {
       this.cutscene.updateInput(input);
       return;
     }
+
+    this.#updateCameraZoom(input, dt);
 
     if (this.player.isDead) {
       this.#updateParticles(dt);
@@ -2119,6 +2125,58 @@ export class Engine {
     });
 
     this.#updateVehicleGuidance(currentVehicle);
+    this.#updateNameplate(currentVehicle);
+  }
+
+  // Cartão da protagonista no HUD (retrato + nome) e nome flutuando sobre ela.
+  #initProtagonistHud() {
+    const chars = this.storyPackage?.characters;
+    if (!(chars instanceof Map) || chars.size === 0) return;
+    const protId = this.storyPackage?.protagonist;
+    const prot = (protId && chars.get(protId)) || chars.values().next().value;
+    if (!prot) return;
+    this.protagonistName = prot.name || '';
+    this.hud.setProtagonist?.({
+      name: prot.name,
+      portrait: prot.sprites?.cutscene || '',
+      fallback: prot.sprites?.front || '',
+    });
+  }
+
+  #updateNameplate(currentVehicle) {
+    if (!this.protagonistName || this.player.isDead || this.player.sinking?.active) return;
+    const lift = currentVehicle ? Math.max(currentVehicle.length, currentVehicle.width) * 0.5 + 14 : 34;
+    const pos = this.#worldToScreen(this.player.x, this.player.y - lift);
+    this.pendingNameplate = { text: this.protagonistName, x: pos.x, y: pos.y };
+  }
+
+  // Zoom da câmera do jogo: roda do mouse ou teclas + / − (0 volta ao padrão).
+  #initCameraZoom(canvas) {
+    this.zoomDefault = 1.22;
+    this.zoomMin = 0.8;
+    this.zoomMax = 2.8;
+    let saved = NaN;
+    try { saved = Number.parseFloat(localStorage.getItem('gta-zoom')); } catch { /* sem storage */ }
+    this.zoomTarget = Number.isFinite(saved) ? Math.min(this.zoomMax, Math.max(this.zoomMin, saved)) : this.zoomDefault;
+    this.renderer.zoom = this.zoomTarget;
+    canvas?.addEventListener('wheel', (e) => {
+      if (!this.running || this.paused || this.cutscene?.active || this.hud.isExpandedMapOpen()) return;
+      e.preventDefault();
+      this.#setZoomTarget(this.zoomTarget * Math.exp(-e.deltaY * 0.0015));
+    }, { passive: false });
+  }
+
+  #setZoomTarget(value) {
+    this.zoomTarget = Math.min(this.zoomMax, Math.max(this.zoomMin, value));
+    try { localStorage.setItem('gta-zoom', this.zoomTarget.toFixed(3)); } catch { /* sem storage */ }
+  }
+
+  #updateCameraZoom(input, dt) {
+    const dir = (input.zoomInPressed ? 1 : 0) - (input.zoomOutPressed ? 1 : 0);
+    if (dir !== 0) this.#setZoomTarget(this.zoomTarget * Math.exp(dir * 1.4 * dt));
+    if (input.resetZoomJustPressed) this.#setZoomTarget(this.zoomDefault);
+    const z = this.renderer.zoom;
+    this.renderer.zoom = z + (this.zoomTarget - z) * Math.min(1, dt * 9);
   }
 
   // Dicas de controle: balão "F Entrar" perto de veículos, barra de controles
