@@ -123,7 +123,7 @@ export const GUN_SHOP = [
 /** Serviços da oficina (dentro de um veículo). */
 export const GARAGE_SHOP = [
   { id: 'conserto', kind: 'repair', name: 'Conserto completo', desc: 'Lataria e motor novos', price: 200 },
-  { id: 'pintura', kind: 'paint', name: 'Pintura nova', desc: 'Troca a cor do veículo', price: 250 },
+  { id: 'pintura', kind: 'paint', name: 'Pintura nova', desc: 'Troca a cor — e despista a polícia!', price: 250 },
   { id: 'neon', kind: 'neon', name: 'Neon por baixo', desc: 'Brilho rosa embaixo do carro', price: 800 },
   { id: 'turbo', kind: 'turbo', name: 'Turbo', desc: 'Mais velocidade e arrancada', price: 1500 },
 ];

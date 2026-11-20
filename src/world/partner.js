@@ -202,6 +202,20 @@ export const PARTNER_LINES = {
     'Abaixa! Abaixa!',
     'Isso vai dar polícia...',
   ],
+  police: [
+    'Sujou! A polícia!',
+    'Acelera, Ana!!',
+    'Despista eles!',
+    'Sirene! Sirene!',
+  ],
+  escaped: [
+    'Ufa! Despistamos!',
+    'Ninguém pega a gente!',
+  ],
+  busted: [
+    'Ai, não... fomos pegas.',
+    'Lá se vai o nosso dinheiro...',
+  ],
   shop: [
     'Boa compra!',
     'Gastou, hein? Valeu a pena.',

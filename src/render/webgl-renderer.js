@@ -262,6 +262,13 @@ export class WebGLRenderer {
         }
       }
 
+      // Giroflex ilumina a rua em vermelho e azul
+      for (const v of vehicles) {
+        if (!v.police || !v.sirenOn || v.destroyed || !inView(v.x, v.y, 300)) continue;
+        const red = Math.floor(time * 6) % 2 === 0;
+        glow(v.x, v.y, 300, red ? [1, 0.1, 0.1] : [0.2, 0.4, 1], 0.55);
+      }
+
       for (const v of vehicles) {
         if (!(v.special || v.neon) || v.destroyed || !inView(v.x, v.y)) continue;
         this.#pushQuad(v.x - v.length, v.y - v.width * 1.3, v.length * 2, v.width * 2.6, v.angle, 'glow', [1, 0.25, 0.7, 0.6 * lights]);
@@ -884,6 +891,29 @@ export class WebGLRenderer {
         v.kind,
         rgba
       );
+      // Viatura: capô e porta-malas pretos, giroflex no teto
+      if (v.police && !v.destroyed) {
+        const cosA = Math.cos(v.angle);
+        const sinA = Math.sin(v.angle);
+        const L = dentLength * pulseScale;
+        const W = dentWidth * pulseScale;
+        for (const f of [0.34, -0.36]) {
+          const cx = v.x + cosA * L * f;
+          const cy = v.y + sinA * L * f;
+          this.#pushQuad(cx - L * 0.13, cy - W * 0.41, L * 0.26, W * 0.82, v.angle, 'solid', [0.06, 0.07, 0.09, 0.92]);
+        }
+        const flash = v.sirenOn ? Math.floor(time * 6) % 2 : -1;
+        const red = flash === 0 ? [1, 0.15, 0.12, 1] : [0.45, 0.06, 0.06, 1];
+        const blue = flash === 1 ? [0.25, 0.5, 1, 1] : [0.06, 0.12, 0.4, 1];
+        for (const [side, col] of [[-1, red], [1, blue]]) {
+          const bx = v.x - sinA * W * 0.19 * side - cosA * L * 0.04;
+          const by = v.y + cosA * W * 0.19 * side - sinA * L * 0.04;
+          this.#pushQuad(bx - 2.5, by - W * 0.18, 5, W * 0.36, v.angle, 'solid', col);
+          if (v.sirenOn && ((side < 0 && flash === 0) || (side > 0 && flash === 1))) {
+            this.#pushQuad(bx - 16, by - 16, 32, 32, 0, 'circle', [col[0], col[1], col[2], 0.55]);
+          }
+        }
+      }
       // Faixas de corrida douradas no carro especial
       if (v.special && !v.destroyed) {
         const cosA = Math.cos(v.angle);

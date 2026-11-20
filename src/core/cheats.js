@@ -9,6 +9,8 @@ export const CHEAT_CODES = [
   { code: 'BANGBANG', id: 'weapons', label: 'Todas as armas!' },
   { code: 'AJUDA', id: 'partner', label: 'A Camila está a caminho!' },
   { code: 'GRANA', id: 'money', label: '+R$ 5.000!' },
+  { code: 'ANJO', id: 'clear-wanted', label: 'Ficha limpa!' },
+  { code: 'CAOS', id: 'more-wanted', label: '+2 estrelas de procurado!' },
   { code: 'LUAR', id: 'night', label: 'Boa noite, cidade!' },
   { code: 'SOLAR', id: 'day', label: 'Bom dia, cidade!' },
 ];

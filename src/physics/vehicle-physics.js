@@ -120,7 +120,9 @@ export function updateVehicle(vehicle, input, dt, cityMap) {
   // Perfil próprio (carro especial / turbo) tem prioridade sobre o do tipo
   const profile = vehicle.profile || VEHICLE_PROFILES[vehicle.kind] || VEHICLE_PROFILES.car;
 
-  if (vehicle.driver === 'player') {
+  // Viaturas usam a mesma física do jogador, com "controles" vindos da IA
+  if (vehicle.driver === 'police') input = vehicle.aiInput || { moveX: 0, actionPressed: false, secondaryPressed: true };
+  if (vehicle.driver === 'player' || vehicle.driver === 'police') {
     const prevCos = Math.cos(vehicle.angle);
     const prevSin = Math.sin(vehicle.angle);
     const prevForward = vehicle.vx * prevCos + vehicle.vy * prevSin;

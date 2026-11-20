@@ -3,7 +3,7 @@ import { RoadPathfinder } from '../world/pathfinding.js';
 import { TrafficManager } from '../world/traffic-manager.js?v=24';
 import { BoatManager } from '../world/boat-manager.js?v=17';
 import { InputManager } from '../input/input-manager.js?v=21';
-import { WebGLRenderer } from '../render/webgl-renderer.js?v=37';
+import { WebGLRenderer } from '../render/webgl-renderer.js?v=38';
 import { isInWater, resolveCircleStaticObstacle, resolveEntityCollisions, resolveVehiclePairCollision } from '../physics/collision.js?v=11';
 import {
   applyPedestrianDamage,
@@ -24,19 +24,22 @@ import {
   updateVehicle,
   updateVehicleCriticalState,
   VEHICLE_PROFILES
-} from '../physics/vehicle-physics.js?v=19';
+} from '../physics/vehicle-physics.js?v=20';
 import { Minimap } from '../ui/minimap.js?v=27';
 import { Inventory } from './inventory.js?v=20';
 import { createSaveSnapshot, saveGameState } from './save-state.js?v=2';
 import { getPendingMissionAssetUrls, preloadMissionAssets } from '../story/story-loader.js';
-import { createPartner, pickLine, updatePartner } from '../world/partner.js?v=2';
-import { createCheatBuffer, SPECIAL_CAR_PROFILE, turboProfile } from './cheats.js?v=2';
+import { createPartner, pickLine, updatePartner } from '../world/partner.js?v=3';
+import { createCheatBuffer, SPECIAL_CAR_PROFILE, turboProfile } from './cheats.js?v=3';
 import {
   createArsenal, cycleWeapon, giveAllWeapons, giveWeapon, selectWeapon, startReload, stepBullets, tickArsenal, tryFire, WEAPONS, WEAPON_ORDER,
 } from './weapons.js?v=1';
 import {
+  clearWanted, createWanted, desiredPoliceCars, driveToward, gridRoute, policeShoots, POLICE_PROFILE, reportCrime, stars as wantedStars, tickWanted,
+} from './police.js?v=1';
+import {
   addMoney, collectibleReward, comboActive, createWallet, GARAGE_SHOP, GUN_SHOP, missionReward, multiplierFor, PAINT_COLORS, REWARDS, spend, tickCombo,
-} from './economy.js?v=1';
+} from './economy.js?v=2';
 
 // Logos dos telhados das lojas (SVG embutido)
 const svgData = (svg) => `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
@@ -76,6 +79,7 @@ export class Engine {
     this.cheatBuffer = createCheatBuffer();
     this.#initWeapons(canvas);
     this.#initEconomy();
+    this.#initPolice();
     // Modo de depuração: ?debug=1 expõe o motor no console (window.gta)
     try {
       if (new URLSearchParams(window.location.search).get('debug') === '1') window.gta = this;
@@ -642,6 +646,12 @@ export class Engine {
 
   resetMatch(startCode = 'CASA-001', targetCode = null) {
     this.vehicles = [];
+    if (this.wanted) {
+      clearWanted(this.wanted);
+      this.policeCars = [];
+      this.policeBullets = [];
+      this.bustTimer = 0;
+    }
     this.trashBins = [];
     this.activeChunkKeys = new Set();
     this.lastVehicleChunkKey = null;
@@ -1580,6 +1590,7 @@ export class Engine {
             const hadNpcDriver = nearest.driver === 'npc';
             if (hadNpcDriver) {
               this.trafficManager.evictDriver(nearest, this.player.radius);
+              this.policeCrime('carjack');
             }
             nearest.driver = 'player';
             nearest.isParked = false;
@@ -1885,6 +1896,7 @@ export class Engine {
         if (isTouchingVehicle(ped.x, ped.y, ped.radius || 10, v, 2)) {
           const dmg = Math.min(100, Math.max(18, Math.round(v.speed * 0.45)));
           const hit = applyPedestrianDamage(ped, dmg, v.vx, v.vy);
+          if (hit.downed && v.driver === 'player') this.policeCrime('ped');
           if (hit.damaged) {
             this.bloodMarks.push({
               x: ped.x,
@@ -2181,6 +2193,7 @@ export class Engine {
     this.#updatePartnerFollow(dt, currentVehicle);
     this.#updateWeapons(dt, currentVehicle);
     this.#updateEconomy(dt, currentVehicle);
+    this.#updatePolice(dt, currentVehicle);
     {
       const ars = this.weapons.arsenal;
       const w = WEAPONS[ars.current];
@@ -2300,6 +2313,7 @@ export class Engine {
         this.bullets.push(...res.bullets);
         this.weaponFx.push({ kind: 'muzzle', x: origin.x, y: origin.y, angle: aimAngle, life: 0, maxLife: 0.06 });
         this.#panicPedestrians(this.player.x, this.player.y, 430);
+        this.policeCrime('shot');
         if (this.shootLineCooldown <= 0) {
           this.partnerSay('shoot');
           this.shootLineCooldown = 12;
@@ -2325,10 +2339,15 @@ export class Engine {
         if (imp.type === 'vehicle') {
           const v = imp.target;
           v.health = Math.max(0, (v.health ?? 100) - imp.damage * 0.55);
-          if (v.health <= 0) this.#triggerVehicleExplosion(v);
+          if (v.police) this.policeCrime('hit-police');
+          if (v.health <= 0) {
+            this.#triggerVehicleExplosion(v);
+            if (!v.police) this.policeCrime('vehicle');
+          }
         } else if (imp.type === 'ped') {
           const ang = Math.atan2(imp.y - this.player.y, imp.x - this.player.x);
-          applyPedestrianDamage(imp.target, imp.damage * 1.6, Math.cos(ang) * 120, Math.sin(ang) * 120);
+          const r = applyPedestrianDamage(imp.target, imp.damage * 1.6, Math.cos(ang) * 120, Math.sin(ang) * 120);
+          if (r.downed) this.policeCrime('ped');
         }
       }
     }
@@ -2345,7 +2364,8 @@ export class Engine {
     const fy = this.player.y + Math.sin(angle) * 16;
     for (const ped of this.trafficManager?.pedestrians || []) {
       if (ped.state === 'downed' || Math.hypot(ped.x - fx, ped.y - fy) > weapon.range) continue;
-      applyPedestrianDamage(ped, weapon.damage, Math.cos(angle) * 160, Math.sin(angle) * 160);
+      const r = applyPedestrianDamage(ped, weapon.damage, Math.cos(angle) * 160, Math.sin(angle) * 160);
+      if (r.downed) this.policeCrime('ped');
       this.weaponFx.push({ kind: 'hit', x: ped.x, y: ped.y, angle, life: 0, maxLife: 0.2 });
       break;
     }
@@ -2371,6 +2391,231 @@ export class Engine {
       ped.dirY = dy / d;
       ped.angle = Math.atan2(ped.dirY, ped.dirX);
     }
+  }
+
+  // ---- Polícia e nível de procurado ----
+  #initPolice() {
+    this.wanted = createWanted();
+    this.policeCars = [];
+    this.policeBullets = [];
+    this.policeSpawnTimer = 0;
+    this.bustTimer = 0;
+    this.lastStars = 0;
+  }
+
+  /** Registra um crime da protagonista. */
+  policeCrime(type) {
+    if (!this.wanted) return;
+    const gained = reportCrime(this.wanted, type);
+    if (gained > 0) {
+      this.hud.flashWanted?.();
+      this.partnerSay('police');
+    }
+  }
+
+  #spawnPoliceCar(target) {
+    const pf = this.pathfinder;
+    if (!pf) return null;
+    const viewW = (this.renderer.viewWidth || 800) / this.renderer.zoom;
+    const viewH = (this.renderer.viewHeight || 600) / this.renderer.zoom;
+    const minDist = Math.max(560, Math.hypot(viewW, viewH) * 0.55);
+    const here = pf.nearestNode(target.x, target.y);
+    const options = [];
+    for (let dx = -5; dx <= 5; dx++) {
+      for (let dy = -5; dy <= 5; dy++) {
+        const ix = here.ix + dx;
+        const iy = here.iy + dy;
+        if (ix < 0 || iy < 0 || ix >= pf.nodesPerAxis || iy >= pf.nodesPerAxis) continue;
+        const p = pf.nodeToWorld(ix, iy);
+        const d = Math.hypot(p.x - target.x, p.y - target.y);
+        if (d < minDist || d > minDist + 700) continue;
+        if (this.vehicles.some((v) => !v.destroyed && Math.hypot(v.x - p.x, v.y - p.y) < 60)) continue;
+        options.push(p);
+      }
+    }
+    if (options.length === 0) return null;
+    const p = options[Math.floor(Math.random() * options.length)];
+    const car = createVehicleEntity({
+      id: `policia-${Date.now()}-${Math.floor(Math.random() * 1e4)}`,
+      kind: 'car',
+      model: 'Viatura',
+      color: '#f1f5f9',
+      x: p.x,
+      y: p.y,
+      angle: Math.atan2(target.y - p.y, target.x - p.x),
+    });
+    car.police = true;
+    car.driver = 'police';
+    car.isParked = false;
+    car.profile = { ...POLICE_PROFILE };
+    car.length = POLICE_PROFILE.length;
+    car.health = 140;
+    car.route = [];
+    car.routeTimer = 0;
+    car.shootCooldown = 1 + Math.random();
+    this.vehicles.push(car);
+    this.policeCars.push(car);
+    return car;
+  }
+
+  #removeVehicle(v) {
+    const i = this.vehicles.indexOf(v);
+    if (i >= 0) this.vehicles.splice(i, 1);
+  }
+
+  #updatePolice(dt, currentVehicle) {
+    const w = this.wanted;
+    const target = currentVehicle || this.player;
+    const level = wantedStars(w);
+
+    // Manutenção da lista de viaturas
+    for (let i = this.policeCars.length - 1; i >= 0; i--) {
+      const car = this.policeCars[i];
+      if (car.driver === 'player') { // roubou a viatura
+        car.police = false;
+        this.policeCars.splice(i, 1);
+        this.policeCrime('carjack');
+        continue;
+      }
+      if (car.destroyed && !car.countedDown) {
+        car.countedDown = true;
+        this.policeCrime('police-down');
+      }
+      const d = Math.hypot(car.x - target.x, car.y - target.y);
+      if (car.destroyed || (level === 0 && d > 950) || d > 2600) {
+        this.policeCars.splice(i, 1);
+        if (!car.destroyed) this.#removeVehicle(car);
+      }
+    }
+
+    // Reforços conforme as estrelas
+    this.policeSpawnTimer = Math.max(0, this.policeSpawnTimer - dt);
+    const active = this.policeCars.filter((c) => !c.destroyed).length;
+    if (active < desiredPoliceCars(level) && this.policeSpawnTimer <= 0) {
+      this.#spawnPoliceCar(target);
+      this.policeSpawnTimer = 2.2;
+    }
+
+    let seen = false;
+    let bustingNow = false;
+    for (const car of this.policeCars) {
+      if (car.destroyed) continue;
+      car.sirenOn = level > 0;
+      const d = Math.hypot(car.x - target.x, car.y - target.y);
+      if (d < 560) seen = true;
+
+      if (level === 0) {
+        // Ficha limpa: a viatura para e vai embora (some quando longe)
+        car.aiInput = { moveX: 0, actionPressed: false, secondaryPressed: car.speed > 20 };
+        continue;
+      }
+
+      car.routeTimer -= dt;
+      if (car.routeTimer <= 0 || !car.route?.length) {
+        car.route = gridRoute(this.pathfinder, car, target);
+        car.routeTimer = 0.7;
+      }
+      while (car.route.length > 1 && Math.hypot(car.route[0].x - car.x, car.route[0].y - car.y) < 46) car.route.shift();
+      const close = d < 170;
+      const onFootClose = !currentVehicle && d < 75;
+      car.waitingAtTarget = onFootClose;
+      if (onFootClose) {
+        car.aiInput = { moveX: 0, actionPressed: false, secondaryPressed: car.speed > 15 };
+      } else {
+        car.aiInput = driveToward(car, close ? target : car.route[0] || target, { ram: close && Boolean(currentVehicle), dt });
+      }
+
+      // Bater na viatura também é crime
+      car.hitCooldown = Math.max(0, (car.hitCooldown || 0) - dt);
+      if (currentVehicle && car.hitCooldown <= 0 && d < (car.radius + currentVehicle.radius + 4)
+        && Math.hypot(currentVehicle.vx - car.vx, currentVehicle.vy - car.vy) > 140) {
+        car.hitCooldown = 1.5;
+        this.policeCrime('hit-police');
+      }
+
+      // Voz de prisão
+      if (!currentVehicle && d < 62 && car.speed < 80) bustingNow = true;
+      if (currentVehicle && d < (car.radius + currentVehicle.radius + 10) && Math.abs(currentVehicle.speed || 0) < 25) bustingNow = true;
+
+      // A partir de 3 estrelas, atiram
+      car.shootCooldown -= dt;
+      if (policeShoots(level) && d < 330 && car.shootCooldown <= 0) {
+        car.shootCooldown = 0.8 + Math.random() * 0.6;
+        const a = Math.atan2(target.y - car.y, target.x - car.x) + (Math.random() - 0.5) * 0.22;
+        const ox = car.x + Math.cos(a) * 20;
+        const oy = car.y + Math.sin(a) * 20;
+        this.policeBullets.push({
+          x: ox, y: oy, prevX: ox, prevY: oy, vx: Math.cos(a) * 1000, vy: Math.sin(a) * 1000,
+          damage: 8, travelled: 0, range: 420, alive: true,
+        });
+        this.weaponFx.push({ kind: 'muzzle', x: ox, y: oy, angle: a, life: 0, maxLife: 0.06 });
+      }
+    }
+
+    // Balas da polícia
+    if (this.policeBullets.length > 0) {
+      const impacts = stepBullets(this.policeBullets, dt, {
+        hitsWall: (x, y) => this.cityMap.getCollidersAround(x, y, 4).some((c) => x >= c.x && x <= c.x + c.w && y >= c.y && y <= c.y + c.h),
+        hitVehicle: (x, y) => (currentVehicle && isTouchingVehicle(x, y, 1.5, currentVehicle, 0) ? currentVehicle : null),
+        hitPedestrian: (x, y) => (!currentVehicle && Math.hypot(this.player.x - x, this.player.y - y) < 11 ? this.player : null),
+      });
+      for (const imp of impacts) {
+        this.weaponFx.push({ kind: imp.type === 'wall' ? 'spark' : 'hit', x: imp.x, y: imp.y, angle: 0, life: 0, maxLife: 0.25 });
+        if (imp.type === 'ped') this.applyDamage(imp.damage, 'A polícia te pegou!');
+        if (imp.type === 'vehicle') {
+          imp.target.health = Math.max(0, (imp.target.health ?? 100) - imp.damage * 0.5);
+          if (imp.target.health <= 0) this.#triggerVehicleExplosion(imp.target);
+        }
+      }
+    }
+
+    // Fuga
+    const ev = tickWanted(w, dt, seen);
+    if (ev === 'escaped') {
+      this.hud.showToast('Você despistou a polícia!', 3000);
+      this.partnerSay('escaped', { force: true });
+    }
+
+    // Presa?
+    this.bustTimer = bustingNow ? this.bustTimer + dt : Math.max(0, this.bustTimer - dt * 2);
+    if (level > 0 && this.bustTimer > 1.4) this.#busted(currentVehicle);
+
+    const nowStars = wantedStars(w);
+    this.hud.setWanted?.({ stars: nowStars, flash: w.flash, busting: this.bustTimer > 0.2 && nowStars > 0 });
+    this.lastStars = nowStars;
+  }
+
+  #busted(currentVehicle) {
+    this.bustTimer = 0;
+    const penalty = Math.min(this.wallet.money, Math.max(100, Math.round(this.wallet.money * 0.1)));
+    spend(this.wallet, penalty);
+    this.#saveEconomy();
+    clearWanted(this.wanted);
+    for (const car of this.policeCars) if (!car.destroyed) this.#removeVehicle(car);
+    this.policeCars = [];
+    this.policeBullets.length = 0;
+    if (currentVehicle) {
+      currentVehicle.driver = null;
+      currentVehicle.vx = 0;
+      currentVehicle.vy = 0;
+      this.player.inVehicleId = null;
+      this.input.setDrivingMode(false);
+    }
+    let spawn = null;
+    try {
+      const mission = this.storyPackage?.missions?.[this.currentMissionIndex];
+      if (mission?.startLocation) spawn = this.cityMap.resolveLocationCode(mission.startLocation).spawnPoint;
+    } catch { spawn = null; }
+    if (spawn) {
+      this.player.x = spawn.x;
+      this.player.y = spawn.y;
+      this.camera.x = spawn.x;
+      this.camera.y = spawn.y;
+    }
+    this.player.speed = 0;
+    if (this.partner) this.partner.state = 'unplaced';
+    this.hud.showBusted?.(penalty);
+    this.partnerSay('busted', { force: true });
   }
 
   // ---- Dinheiro, combos e lojas ----
@@ -2572,6 +2817,15 @@ export class Engine {
       if (it.kind === 'paint') {
         const idx = PAINT_COLORS.indexOf(vehicle.color);
         vehicle.color = PAINT_COLORS[(idx + 1) % PAINT_COLORS.length];
+        // Pintura nova despista a polícia (se nenhuma viatura estiver olhando)
+        if (wantedStars(this.wanted) > 0) {
+          if (this.wanted.seenRecently) {
+            this.hud.showToast('A polícia viu você entrar! Pintura não adiantou.', 3200);
+          } else {
+            clearWanted(this.wanted);
+            this.hud.showToast('Carro novo, ficha limpa! A polícia perdeu você.', 3200);
+          }
+        }
       }
       if (it.kind === 'neon') vehicle.neon = true;
       if (it.kind === 'turbo') {
@@ -2640,6 +2894,13 @@ export class Engine {
         break;
       case 'money':
         this.#earn(REWARDS.cheat, 'Código GRANA');
+        break;
+      case 'clear-wanted':
+        clearWanted(this.wanted);
+        break;
+      case 'more-wanted':
+        reportCrime(this.wanted, 'cheat', 2);
+        this.hud.flashWanted?.();
         break;
       case 'night':
         this.renderer.dayCycle.startHour = 22;
@@ -3049,7 +3310,7 @@ export class Engine {
       player: this.player,
       playerSprites: this.#getProtagonistSprites(),
       partner: this.partner,
-      bullets: this.bullets,
+      bullets: this.policeBullets?.length ? [...this.bullets, ...this.policeBullets] : this.bullets,
       weaponFx: this.weaponFx,
       skidMarks: this.skidMarks,
       bloodMarks: this.bloodMarks,

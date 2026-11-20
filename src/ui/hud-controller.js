@@ -1107,6 +1107,46 @@ export class HudController {
     card.classList.remove('hidden');
   }
 
+  // ---- Polícia ----
+  setWanted({ stars = 0, flash = false, busting = false } = {}) {
+    if (!this.wantedEl) {
+      this.wantedEl = document.getElementById('wanted-badge');
+      this.wantedStarEls = this.wantedEl ? [...this.wantedEl.querySelectorAll('.wanted-star')] : [];
+      this.policeVignetteEl = document.getElementById('police-vignette');
+    }
+    if (!this.wantedEl) return;
+    const key = `${stars}|${flash}`;
+    if (key !== this.wantedKey) {
+      this.wantedKey = key;
+      this.wantedEl.classList.toggle('hidden', stars === 0);
+      this.wantedEl.classList.toggle('flash', flash);
+      this.wantedStarEls.forEach((el, i) => el.classList.toggle('on', i < stars));
+      this.wantedEl.setAttribute('aria-label', `Procurado: ${stars} de 5 estrelas`);
+    }
+    this.policeVignetteEl?.classList.toggle('on', stars > 0 && (busting || !flash));
+  }
+
+  flashWanted() {
+    const el = this.wantedEl || document.getElementById('wanted-badge');
+    if (!el) return;
+    el.classList.remove('pop');
+    void el.offsetWidth;
+    el.classList.add('pop');
+  }
+
+  showBusted(penalty) {
+    const el = document.getElementById('busted-banner');
+    if (!el) return;
+    document.getElementById('busted-sub').textContent = penalty > 0
+      ? `A polícia levou ${this.#fmtMoney(penalty)}`
+      : 'A polícia te levou para a delegacia';
+    el.classList.add('hidden');
+    void el.offsetWidth;
+    el.classList.remove('hidden');
+    clearTimeout(this.bustedTimer);
+    this.bustedTimer = setTimeout(() => el.classList.add('hidden'), 3300);
+  }
+
   // ---- Dinheiro, combos e lojas ----
   #fmtMoney(v) {
     const n = Math.max(0, Math.round(v || 0));

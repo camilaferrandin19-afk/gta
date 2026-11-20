@@ -22,7 +22,7 @@
   <link rel="shortcut icon" href="./story/vibe-coding/favicon.svg">
   <link rel="apple-touch-icon" sizes="180x180" href="./icon-180.png">
   <title>Missão Vibe Coding — Curso em Vídeo</title>
-  <link rel="stylesheet" href="./styles/main.css?v=47">
+  <link rel="stylesheet" href="./styles/main.css?v=48">
 </head>
 <body>
   <div id="game-shell">
@@ -40,6 +40,9 @@
         </div>
         <div id="money-badge" class="hud-pill money-badge" aria-label="Dinheiro">
           <span id="money-value">R$ 0</span>
+        </div>
+        <div id="wanted-badge" class="hud-pill wanted-badge hidden" aria-label="Nível de procurado">
+          <span class="wanted-star">★</span><span class="wanted-star">★</span><span class="wanted-star">★</span><span class="wanted-star">★</span><span class="wanted-star">★</span>
         </div>
         <div id="top-bar">
           <div id="vehicle-badge" class="hud-pill">
@@ -114,6 +117,11 @@
         <div class="combo-track"><div id="combo-timer" class="combo-timer"></div></div>
       </div>
       <div id="money-popups" aria-hidden="true"></div>
+      <div id="police-vignette" class="police-vignette" aria-hidden="true"></div>
+      <div id="busted-banner" class="busted-banner hidden" role="alert">
+        <div class="busted-title">PRESA!</div>
+        <div id="busted-sub" class="busted-sub"></div>
+      </div>
 
       <div id="shop-modal" class="shop-modal hidden" role="dialog" aria-modal="true" aria-labelledby="shop-title">
         <div class="shop-card">
@@ -434,6 +442,6 @@
       });
     })();
   </script>
-  <script type="module" src="./src/main.js?v=86"></script>
+  <script type="module" src="./src/main.js?v=87"></script>
 </body>
 </html>
