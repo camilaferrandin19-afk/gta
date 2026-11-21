@@ -2640,6 +2640,11 @@ export class Engine {
       }
       if (ars.owned.has(saved.weapons.current)) ars.current = saved.weapons.current;
     }
+    // A Ana Laura sempre começa com uma pistola (vale também para saves antigos).
+    if (!ars.owned.has('pistola')) {
+      giveWeapon(ars, 'pistola', 48);
+      if (!saved?.weapons?.current || saved.weapons.current === 'punhos') selectWeapon(ars, 'pistola');
+    }
     this.nearMissCooldowns = new Map();
     this.ecoLastVehicleHealth = null;
     this.shopOpen = false;
