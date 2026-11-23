@@ -320,6 +320,16 @@ export function createTextureAtlas() {
   registerRect('car', 0, 384, 256, 128, drawCarTopDown);
   registerRect('van', 256, 384, 256, 128, drawVanTopDown);
   registerRect('moto', 512, 384, 256, 128, drawMotoTopDown);
+  registerRect('car-sport', 0, 512, 256, 128, drawSportCar);
+  registerRect('car-hatch', 256, 512, 256, 128, drawHatchCar);
+  registerRect('car-suv', 512, 512, 256, 128, drawSuvCar);
+  registerRect('car-pickup', 768, 512, 256, 128, drawPickupCar);
+
+  // Árvores e arbustos (cores próprias, sem tint)
+  registerRect('tree1', 0, 640, 128, 128, (c, x, y, w) => drawTree(c, x, y, w, ['#2f7d32', '#3f9a42', '#5cb85c', '#8bd17c'], 7, 11));
+  registerRect('tree2', 128, 640, 128, 128, (c, x, y, w) => drawTree(c, x, y, w, ['#1f6b4a', '#2e8a5f', '#46a877', '#7fd1a2'], 9, 23));
+  registerRect('tree3', 256, 640, 128, 128, (c, x, y, w) => drawPalm(c, x, y, w));
+  registerRect('bush', 384, 640, 128, 128, (c, x, y, w) => drawTree(c, x, y, w, ['#3d7a2a', '#55993a', '#76b84f', '#e46a9a'], 5, 37, true));
 
   // Sombra suave (retângulo arredondado desfocado) para veículos e personagens
   register('softshadow', 6, 3, (c, x, y, s) => {
@@ -483,6 +493,7 @@ function drawCarTopDown(c, x, y, W, H) {
   c.fillStyle = '#e0241b';
   roundRect(c, x + 12, y + 20, 8, 18, 3); c.fill();
   roundRect(c, x + 12, y + H - 38, 8, 18, 3); c.fill();
+  paintShine(c, x + 8, y + 12, W - 16, H - 24);
 }
 
 function drawVanTopDown(c, x, y, W, H) {
@@ -603,4 +614,245 @@ function drawMotoTopDown(c, x, y, W, H) {
   roundRect(c, x + 222, cy - 9, 12, 18, 5); c.fill();
   c.fillStyle = '#e0241b';
   roundRect(c, x + 6, cy - 6, 8, 12, 3); c.fill();
+}
+
+// ---- Modelos extras de carro (mesma proporção 2:1, frente = +x) ----
+function drawCarModel(c, x, y, W, H, o) {
+  const bx0 = x + o.back;
+  const bx1 = x + W - o.front;
+  const by0 = y + o.side;
+  const by1 = y + H - o.side;
+  const bw = bx1 - bx0;
+  const bh = by1 - by0;
+
+  // Rodas
+  const wl = o.wheelLen || 44;
+  const wh = 14;
+  for (const wx of [bx0 + bw * 0.12, bx0 + bw * 0.7]) {
+    wheel(c, wx, by0 - 7, wl, wh);
+    wheel(c, wx, by1 - wh + 7, wl, wh);
+  }
+
+  // Retrovisores
+  c.fillStyle = '#d4d8de';
+  c.strokeStyle = '#5b6270';
+  c.lineWidth = 2;
+  for (const my of [by0 - 4, by1 + 4]) {
+    c.beginPath();
+    c.ellipse(x + o.cabinTo + 6, my, 7, 5, 0, 0, Math.PI * 2);
+    c.fill();
+    c.stroke();
+  }
+
+  // Carroceria
+  c.fillStyle = bodyGradient(c, by0, bh);
+  roundRect(c, bx0, by0, bw, bh, o.radius);
+  c.fill();
+  c.strokeStyle = '#555c68';
+  c.lineWidth = 2.5;
+  c.stroke();
+
+  // Caçamba da picape (aberta, escura)
+  if (o.bed) {
+    c.fillStyle = '#2a2f37';
+    roundRect(c, bx0 + 8, by0 + 10, x + o.cabinFrom - bx0 - 14, bh - 20, 6);
+    c.fill();
+    c.strokeStyle = 'rgba(255,255,255,0.12)';
+    c.lineWidth = 2;
+    for (let ly = by0 + 22; ly < by1 - 14; ly += 12) {
+      c.beginPath(); c.moveTo(bx0 + 12, ly); c.lineTo(x + o.cabinFrom - 10, ly); c.stroke();
+    }
+  }
+
+  // Para-choques
+  c.fillStyle = '#8d939d';
+  roundRect(c, bx1 - 6, by0 + 18, 7, bh - 36, 3); c.fill();
+  roundRect(c, bx0 - 1, by0 + 20, 7, bh - 40, 3); c.fill();
+
+  // Entrada de ar e vincos do capô (esportivo)
+  if (o.scoop) {
+    c.fillStyle = 'rgba(0,0,0,0.35)';
+    roundRect(c, x + o.cabinTo + o.shield + 14, y + H / 2 - 9, 30, 18, 5); c.fill();
+    c.strokeStyle = 'rgba(0,0,0,0.25)';
+    c.lineWidth = 2;
+    c.beginPath();
+    c.moveTo(x + o.cabinTo + o.shield + 6, by0 + 22); c.lineTo(bx1 - 12, by0 + 30);
+    c.moveTo(x + o.cabinTo + o.shield + 6, by1 - 22); c.lineTo(bx1 - 12, by1 - 30);
+    c.stroke();
+  }
+
+  // Para-brisa
+  const sx0 = x + o.cabinTo;
+  const sx1 = sx0 + o.shield;
+  c.fillStyle = glassGradient(c, sx0, sx1);
+  poly(c, [[sx0, by0 + 10], [sx1, by0 + 20], [sx1, by1 - 20], [sx0, by1 - 10]]);
+  c.fill();
+  glassShine(c, sx0 + 4, by0 + 14, o.shield * 0.7, bh - 28);
+
+  // Vidro traseiro
+  if (o.rearGlass > 0) {
+    const rx1 = x + o.cabinFrom;
+    const rx0 = rx1 - o.rearGlass;
+    c.fillStyle = glassGradient(c, rx1, rx0);
+    poly(c, [[rx0, by0 + 20], [rx1, by0 + 12], [rx1, by1 - 12], [rx0, by1 - 20]]);
+    c.fill();
+  }
+
+  // Teto
+  const roof = c.createLinearGradient(0, by0 + 12, 0, by1 - 12);
+  roof.addColorStop(0, '#dfe3e8');
+  roof.addColorStop(0.5, '#ffffff');
+  roof.addColorStop(1, '#d6dae0');
+  c.fillStyle = roof;
+  roundRect(c, x + o.cabinFrom, by0 + 12, o.cabinTo - o.cabinFrom, bh - 24, 10);
+  c.fill();
+  c.strokeStyle = 'rgba(0,0,0,0.18)';
+  c.lineWidth = 1.5;
+  c.stroke();
+
+  // Bagageiro no teto (SUV)
+  if (o.rails) {
+    c.fillStyle = '#3b4049';
+    c.fillRect(x + o.cabinFrom + 6, by0 + 16, o.cabinTo - o.cabinFrom - 12, 4);
+    c.fillRect(x + o.cabinFrom + 6, by1 - 20, o.cabinTo - o.cabinFrom - 12, 4);
+    for (let rx = x + o.cabinFrom + 18; rx < x + o.cabinTo - 10; rx += 22) {
+      c.fillRect(rx, by0 + 16, 3, bh - 32);
+    }
+  }
+
+  // Vidros laterais
+  c.fillStyle = 'rgba(20,28,40,0.85)';
+  c.fillRect(x + o.cabinFrom + 4, by0 + 3, o.cabinTo - o.cabinFrom - 6, 8);
+  c.fillRect(x + o.cabinFrom + 4, by1 - 11, o.cabinTo - o.cabinFrom - 6, 8);
+
+  // Aerofólio
+  if (o.spoiler) {
+    c.fillStyle = '#2b3038';
+    roundRect(c, bx0 + 4, by0 + 6, 10, bh - 12, 3); c.fill();
+    c.fillStyle = 'rgba(255,255,255,0.18)';
+    c.fillRect(bx0 + 6, by0 + 8, 3, bh - 16);
+  }
+
+  // Faróis e lanternas
+  c.fillStyle = '#fff6cf';
+  roundRect(c, bx1 - 14, by0 + 6, 10, 18, 4); c.fill();
+  roundRect(c, bx1 - 14, by1 - 24, 10, 18, 4); c.fill();
+  c.fillStyle = '#e0241b';
+  roundRect(c, bx0 + 4, by0 + 8, 7, 16, 3); c.fill();
+  roundRect(c, bx0 + 4, by1 - 24, 7, 16, 3); c.fill();
+
+  paintShine(c, bx0, by0, bw, bh);
+}
+
+// Reflexo de pintura: faixa de brilho diagonal suave
+function paintShine(c, x, y, w, h) {
+  c.save();
+  const g = c.createLinearGradient(x, y, x + w * 0.6, y + h);
+  g.addColorStop(0, 'rgba(255,255,255,0)');
+  g.addColorStop(0.45, 'rgba(255,255,255,0.3)');
+  g.addColorStop(0.55, 'rgba(255,255,255,0)');
+  c.fillStyle = g;
+  roundRect(c, x + 4, y + 4, w - 8, h - 8, 18);
+  c.fill();
+  c.restore();
+}
+
+function drawSportCar(c, x, y, W, H) {
+  drawCarModel(c, x, y, W, H, { front: 4, back: 6, side: 14, radius: 34, cabinFrom: 74, cabinTo: 138, shield: 40, rearGlass: 18, spoiler: true, scoop: true, wheelLen: 48 });
+}
+function drawHatchCar(c, x, y, W, H) {
+  drawCarModel(c, x, y, W, H, { front: 22, back: 22, side: 14, radius: 34, cabinFrom: 40, cabinTo: 156, shield: 30, rearGlass: 0, wheelLen: 40 });
+}
+function drawSuvCar(c, x, y, W, H) {
+  drawCarModel(c, x, y, W, H, { front: 6, back: 6, side: 9, radius: 16, cabinFrom: 26, cabinTo: 176, shield: 26, rearGlass: 0, rails: true, wheelLen: 48 });
+}
+function drawPickupCar(c, x, y, W, H) {
+  drawCarModel(c, x, y, W, H, { front: 6, back: 6, side: 10, radius: 14, cabinFrom: 112, cabinTo: 168, shield: 26, rearGlass: 6, bed: true, wheelLen: 48 });
+}
+
+// ---- Árvores vistas de cima ----
+function seeded(seed) {
+  let s = seed >>> 0;
+  return () => {
+    s = (s * 1664525 + 1013904223) >>> 0;
+    return s / 4294967296;
+  };
+}
+
+function drawTree(c, x, y, size, colors, blobs, seed, flowers = false) {
+  const rnd = seeded(seed);
+  const cx = x + size / 2;
+  const cy = y + size / 2;
+  const R = size * 0.4;
+  // contorno escuro da copa
+  c.fillStyle = 'rgba(10,30,12,0.55)';
+  for (let i = 0; i < blobs; i++) {
+    const a = (i / blobs) * Math.PI * 2;
+    c.beginPath();
+    c.arc(cx + Math.cos(a) * R * 0.55, cy + Math.sin(a) * R * 0.55, R * 0.5 + 2, 0, Math.PI * 2);
+    c.fill();
+  }
+  // camadas: escura embaixo, clara em cima-esquerda (luz do sol)
+  const layers = [
+    { col: colors[0], r: 0.5, off: 0.55, dx: 0.06, dy: 0.06 },
+    { col: colors[1], r: 0.42, off: 0.45, dx: 0, dy: 0 },
+    { col: colors[2], r: 0.3, off: 0.32, dx: -0.08, dy: -0.08 },
+  ];
+  for (const L of layers) {
+    c.fillStyle = L.col;
+    for (let i = 0; i < blobs; i++) {
+      const a = (i / blobs) * Math.PI * 2 + rnd() * 0.5;
+      const rr = R * L.r * (0.85 + rnd() * 0.3);
+      c.beginPath();
+      c.arc(cx + R * L.dx + Math.cos(a) * R * L.off, cy + R * L.dy + Math.sin(a) * R * L.off, rr, 0, Math.PI * 2);
+      c.fill();
+    }
+    c.beginPath();
+    c.arc(cx + R * L.dx, cy + R * L.dy, R * L.r, 0, Math.PI * 2);
+    c.fill();
+  }
+  // brilhos e folhinhas
+  c.fillStyle = colors[3];
+  for (let i = 0; i < 14; i++) {
+    const a = rnd() * Math.PI * 2;
+    const d = rnd() * R * 0.7;
+    c.globalAlpha = flowers ? 1 : 0.55;
+    c.beginPath();
+    c.arc(cx - R * 0.15 + Math.cos(a) * d, cy - R * 0.15 + Math.sin(a) * d, flowers ? 3.5 : 4 + rnd() * 3, 0, Math.PI * 2);
+    c.fill();
+  }
+  c.globalAlpha = 1;
+}
+
+function drawPalm(c, x, y, size) {
+  const cx = x + size / 2;
+  const cy = y + size / 2;
+  const R = size * 0.44;
+  const fronds = 9;
+  for (let i = 0; i < fronds; i++) {
+    const a = (i / fronds) * Math.PI * 2;
+    const tipX = cx + Math.cos(a) * R;
+    const tipY = cy + Math.sin(a) * R;
+    const nx = -Math.sin(a) * 10;
+    const ny = Math.cos(a) * 10;
+    c.fillStyle = i % 2 ? '#2f8f3a' : '#3fa84a';
+    c.strokeStyle = 'rgba(10,40,12,0.6)';
+    c.lineWidth = 1.5;
+    c.beginPath();
+    c.moveTo(cx, cy);
+    c.quadraticCurveTo(cx + Math.cos(a) * R * 0.5 + nx, cy + Math.sin(a) * R * 0.5 + ny, tipX, tipY);
+    c.quadraticCurveTo(cx + Math.cos(a) * R * 0.5 - nx, cy + Math.sin(a) * R * 0.5 - ny, cx, cy);
+    c.fill();
+    c.stroke();
+    c.strokeStyle = 'rgba(200,240,150,0.5)';
+    c.lineWidth = 1.2;
+    c.beginPath();
+    c.moveTo(cx, cy);
+    c.lineTo(cx + Math.cos(a) * R * 0.9, cy + Math.sin(a) * R * 0.9);
+    c.stroke();
+  }
+  c.fillStyle = '#7a5230';
+  c.beginPath();
+  c.arc(cx, cy, 7, 0, Math.PI * 2);
+  c.fill();
 }

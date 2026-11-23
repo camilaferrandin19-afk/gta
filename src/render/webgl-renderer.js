@@ -1,4 +1,4 @@
-import { createTextureAtlas } from './texture-atlas.js?v=18';
+import { createTextureAtlas } from './texture-atlas.js?v=19';
 import { createLightAtlas, createDayCycle } from './lighting.js?v=2';
 
 const VERTEX_SHADER = `
@@ -373,6 +373,53 @@ export class WebGLRenderer {
     this.viewHeight = height;
   }
 
+  // Mureta (platibanda) com luz e sombra + caixas de ar-condicionado, claraboias e caixa d'água
+  #drawRoofDetails(roof, ra) {
+    const [r, g, b] = roof.color;
+    const dark = [r * 0.62, g * 0.62, b * 0.62, ra];
+    const light = [Math.min(1, r * 1.25 + 0.08), Math.min(1, g * 1.25 + 0.08), Math.min(1, b * 1.25 + 0.08), ra * 0.85];
+    const e = 5;
+    // borda escura em volta e brilho nas bordas de cima/esquerda (luz vindo do noroeste)
+    this.#pushQuad(roof.x, roof.y + roof.h - e, roof.w, e, 0, 'solid', dark);
+    this.#pushQuad(roof.x + roof.w - e, roof.y, e, roof.h, 0, 'solid', dark);
+    this.#pushQuad(roof.x, roof.y, roof.w, e, 0, 'solid', dark);
+    this.#pushQuad(roof.x, roof.y, e, roof.h, 0, 'solid', dark);
+    this.#pushQuad(roof.x + e, roof.y + e, roof.w - 2 * e, 2, 0, 'solid', light);
+    this.#pushQuad(roof.x + e, roof.y + e, 2, roof.h - 2 * e, 0, 'solid', light);
+
+    if (roof.isHospital || roof.isEncounter || roof.w < 70 || roof.h < 60) return;
+    let seed = (Math.round(roof.x) * 73856093) ^ (Math.round(roof.y) * 19349663);
+    const rnd = () => {
+      seed = (seed * 1664525 + 1013904223) >>> 0;
+      return seed / 4294967296;
+    };
+    const count = 1 + Math.floor(rnd() * 3);
+    const corners = [[0.18, 0.22], [0.82, 0.22], [0.18, 0.78], [0.82, 0.78]];
+    for (let i = 0; i < count; i++) {
+      const [fx, fy] = corners.splice(Math.floor(rnd() * corners.length), 1)[0];
+      const cx = roof.x + roof.w * fx;
+      const cy = roof.y + roof.h * fy;
+      const kind = rnd();
+      if (kind < 0.5) {
+        // ar-condicionado
+        this.#pushQuad(cx - 8 + 3, cy - 6 + 4, 16, 12, 0, 'solid', [0, 0, 0, 0.3 * ra]);
+        this.#pushQuad(cx - 8, cy - 6, 16, 12, 0, 'solid', [0.78, 0.8, 0.83, ra]);
+        this.#pushQuad(cx - 5, cy - 4, 10, 8, 0, 'disc', [0.35, 0.38, 0.42, ra]);
+        this.#pushQuad(cx - 1.5, cy - 1.5, 3, 3, 0, 'disc', [0.75, 0.78, 0.8, ra]);
+      } else if (kind < 0.8) {
+        // claraboia de vidro
+        this.#pushQuad(cx - 12, cy - 8, 24, 16, 0, 'solid', [0.22, 0.25, 0.3, ra]);
+        this.#pushQuad(cx - 10, cy - 6, 20, 12, 0, 'solid', [0.45, 0.66, 0.82, ra]);
+        this.#pushQuad(cx - 8, cy - 5, 6, 10, 0.5, 'solid', [1, 1, 1, 0.35 * ra]);
+      } else {
+        // caixa d'água
+        this.#pushQuad(cx - 9 + 3, cy - 9 + 4, 18, 18, 0, 'disc', [0, 0, 0, 0.3 * ra]);
+        this.#pushQuad(cx - 9, cy - 9, 18, 18, 0, 'disc', [0.24, 0.42, 0.72, ra]);
+        this.#pushQuad(cx - 6, cy - 6, 12, 12, 0, 'disc', [0.36, 0.56, 0.86, ra]);
+      }
+    }
+  }
+
   #pushQuad(x, y, w, h, angle, uvName, rgba) {
     if (this.quadCount >= this.maxQuads) {
       return;
@@ -604,6 +651,20 @@ export class WebGLRenderer {
       }
     }
 
+    // Árvores: canteiro de terra e sombra no chão (a copa é desenhada por cima das pessoas)
+    const visibleTrees = [];
+    for (const block of visibleBlocks) {
+      for (const t of blockDecor(block).trees) {
+        if (t.x < minX - 40 || t.x > maxX + 40 || t.y < minY - 40 || t.y > maxY + 40) continue;
+        visibleTrees.push(t);
+        if (!t.bush) {
+          this.#pushQuad(t.x - 7, t.y - 7, 14, 14, 0, 'disc', [0.36, 0.26, 0.16, 0.9]);
+        }
+        const sh = t.r * 2.5;
+        this.#pushQuad(t.x + t.r * 0.35 - sh * 0.5, t.y + t.r * 0.45 - sh * 0.5, sh, sh, 0, 'softshadow', [0, 0, 0, 0.32]);
+      }
+    }
+
     // Marcas de drift (sobre asfalto, calçada e gramado)
     for (const mark of skidMarks) {
       if (mark.x < minX || mark.x > maxX || mark.y < minY || mark.y > maxY) continue;
@@ -647,7 +708,9 @@ export class WebGLRenderer {
         const isInside = player.insideLocationCode === building.code;
 
         // Sombra suave da edificação
-        this.#pushQuad(bb.x + 6, bb.y + 6, bb.w, bb.h, 0, 'solid', [0, 0, 0, 0.28]);
+        // Sombra em duas camadas: projeta o "volume" do prédio para baixo/direita
+        this.#pushQuad(bb.x + 12, bb.y + 14, bb.w, bb.h, 0, 'solid', [0, 0, 0, 0.12]);
+        this.#pushQuad(bb.x + 6, bb.y + 7, bb.w, bb.h, 0, 'solid', [0, 0, 0, 0.24]);
 
         // Interior sempre desenhado por baixo
         this.#pushQuad(bb.x, bb.y, bb.w, bb.h, 0, 'floor', hexToRgba(building.floorColor));
@@ -888,7 +951,7 @@ export class WebGLRenderer {
         dentLength * pulseScale,
         dentWidth * pulseScale,
         v.angle,
-        v.kind,
+        vehicleUv(v),
         rgba
       );
       // Viatura: capô e porta-malas pretos, giroflex no teto
@@ -1114,6 +1177,7 @@ export class WebGLRenderer {
     for (const roof of closedRoofs) {
       const ra = roof.alpha ?? 1;
       this.#pushQuad(roof.x, roof.y, roof.w, roof.h, 0, 'roof', roof.color);
+      this.#drawRoofDetails(roof, ra);
       if (roof.isHospital) {
         const crossLen = Math.min(roof.w, roof.h) * 0.56;
         const armThick = Math.max(10, Math.round(crossLen * 0.3));
@@ -1153,6 +1217,15 @@ export class WebGLRenderer {
           this.#pushQuad(cx - dotSize * 0.5, topY + barH + gap, dotSize, dotSize, 0, 'disc', white);
         }
       }
+    }
+
+    // Copas das árvores por cima das pessoas (ficam transparentes quando a protagonista passa embaixo)
+    for (const t of visibleTrees) {
+      const d = Math.hypot(player.x - t.x, player.y - t.y);
+      const alpha = d < t.r + 16 ? 0.38 : 1;
+      const s = t.r * 2.3;
+      const sway = Math.sin(time * 1.3 + t.x * 0.05) * 0.04;
+      this.#pushQuad(t.x - s * 0.5, t.y - s * 0.5, s, s, t.rot + sway, t.uv, [1, 1, 1, alpha]);
     }
 
     // Ondas circulares estilo sinal Wi-Fi ao redor do personagem de destino (visíveis mesmo com teto fechado)
@@ -1537,4 +1610,86 @@ export class WebGLRenderer {
 
     this.#renderLighting({ camera, cityMap, vehicles, boats, explosions, player, visibleBlocks, time, weaponFx });
   }
+}
+
+// Modelo do carro (sedan, hatch, SUV, picape, esportivo), fixo por veículo.
+// v.model é o nome exibido ("Cupê Esportivo"...); a textura escolhida fica em v.texModel.
+const CAR_BY_NAME = { 'Cupê Esportivo': 'car-sport', 'Compacto Retrô': 'car-hatch' };
+const SEDAN_VARIANTS = ['car', 'car', 'car-suv', 'car-pickup'];
+function vehicleUv(v) {
+  if (v.kind !== 'car') return v.kind;
+  if (v.texModel) return v.texModel;
+  if (v.police) return 'car';
+  if (v.special) return (v.texModel = 'car-sport');
+  let tex = CAR_BY_NAME[v.model];
+  if (!tex) {
+    const id = String(v.id || '');
+    let h = 0;
+    for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
+    tex = SEDAN_VARIANTS[h % SEDAN_VARIANTS.length];
+  }
+  v.texModel = tex;
+  return tex;
+}
+
+// Árvores e arbustos de cada quarteirão (posição fixa, calculada uma vez)
+const decorCache = new WeakMap();
+const TREE_UVS = ['tree1', 'tree2', 'tree1', 'tree2', 'tree3'];
+function blockDecor(block) {
+  let decor = decorCache.get(block);
+  if (decor) return decor;
+  const b = block.bounds;
+  let seed = (Math.round(b.x) * 2654435761) ^ (Math.round(b.y) * 40503);
+  const rnd = () => {
+    seed = (seed * 1664525 + 1013904223) >>> 0;
+    return seed / 4294967296;
+  };
+  const blockers = [];
+  for (const bd of block.buildings || []) {
+    blockers.push({ ...bd.bounds, pad: 4 });
+    if (bd.doormat) blockers.push({ ...bd.doormat, pad: 34 });
+  }
+  for (const o of block.obstacles || []) blockers.push({ ...o, pad: 4 });
+  for (const p of block.plaza?.props || []) blockers.push({ ...p, pad: 10 });
+  const clearance = (x, y) => {
+    let best = Math.min(x - b.x, b.x + b.w - x, y - b.y, b.y + b.h - y) + 6;
+    for (const k of blockers) {
+      const dx = Math.max(k.x - k.pad - x, 0, x - (k.x + k.w + k.pad));
+      const dy = Math.max(k.y - k.pad - y, 0, y - (k.y + k.h + k.pad));
+      const inside = dx === 0 && dy === 0;
+      best = Math.min(best, inside ? -1 : Math.hypot(dx, dy));
+    }
+    return best;
+  };
+  const trees = [];
+  const pb = block.plaza?.bounds;
+  const step = 46;
+  for (let y = b.y + 16; y < b.y + b.h - 8; y += step) {
+    for (let x = b.x + 16; x < b.x + b.w - 8; x += step) {
+      const px = x + (rnd() - 0.5) * 12;
+      const py = y + (rnd() - 0.5) * 12;
+      // deixa livres as esquinas (faixas de pedestre)
+      const nearCornerX = px - b.x < 40 || b.x + b.w - px < 40;
+      const nearCornerY = py - b.y < 40 || b.y + b.h - py < 40;
+      if (nearCornerX && nearCornerY) continue;
+      const inPlaza = pb && px > pb.x && px < pb.x + pb.w && py > pb.y && py < pb.y + pb.h;
+      if (rnd() > (inPlaza ? 0.8 : 0.42)) continue;
+      const cl = clearance(px, py);
+      if (cl < 9) continue;
+      const bush = cl < 14 || rnd() < 0.18;
+      const r = bush ? Math.min(10, cl - 1) : Math.min(22, Math.max(14, cl - 2));
+      if (trees.some((t) => Math.hypot(t.x - px, t.y - py) < (t.r + r) * 0.9)) continue;
+      trees.push({
+        x: px,
+        y: py,
+        r,
+        bush,
+        uv: bush ? 'bush' : TREE_UVS[Math.floor(rnd() * TREE_UVS.length)],
+        rot: rnd() * Math.PI * 2,
+      });
+    }
+  }
+  decor = { trees };
+  decorCache.set(block, decor);
+  return decor;
 }
