@@ -1,17 +1,18 @@
 ---
 title: GTA: Aventura da Ana Laura
 page_title: Aventura da Ana Laura
-subtitle: Cruzando a cidade para descobrir o segredo guardado em uma caixa secreta e lidando com GPUs, servidores e robôs!
+subtitle: Ana Laura e Camila abrem a Entregas Turbo, investigam sumiços misteriosos, enfrentam a gangue das Serpentes e disputam o Grande Racha da cidade!
 splash: splash/abertura-ana-laura.png
 protagonist: ana-laura
 partner: camila
-characters: ana-laura, jason, camila, lucia, pundar, maltmon, kaue
-items: caixa-secreta, placa-video, servidor, peca-robo, chave-secreta, disquete, pente-memoria, conector-ethernet, cooler-rgb, bateria-robo, caderno-prompts, token-dourado, manual-regex, cracha-gafanhoto, caneca-cafe, oculos-vibe-coder, pendrive-criptografado
-collectibles: disquete @ PRACA-003 (especial), pente-memoria @ COM-018 (normal), conector-ethernet @ RUA-004 x RUA-036 NE (normal), cooler-rgb @ PRACA-008 (normal), bateria-robo @ HOSP-005 (especial), caderno-prompts @ CASA-042 (lendario), token-dourado @ PRACA-014 (lendario), manual-regex @ RUA-012 x RUA-044 SO (especial), cracha-gafanhoto @ PRACA-021 (normal), caneca-cafe @ CASA-001 (normal), oculos-vibe-coder @ COM-120 (especial), pendrive-criptografado @ RUA-020 x RUA-050 NO (lendario)
-missions: 01-caixa-secreta, 02-placa-de-video, 03-servidor-alucinado, 04-peca-do-robo, 05-chave-do-vibe-coding
-encounters: extra-casa-hostnet
+characters: ana-laura, camila, zuzu, rosa, toninho, vibora
+items: bolo-casamento, luva-escama, foto-camera, controle-portao, turbo-novo, bandeira-quadriculada, fita-cassete, figurinha-rara, patins, oculos-escuros, radio-antigo, trofeu-mini, dado-pelucia, mapa-tesouro, chaveiro-cobra
+collectibles: fita-cassete @ PRACA-003 (especial), figurinha-rara @ COM-018 (normal), patins @ RUA-004 x RUA-036 NE (normal), oculos-escuros @ PRACA-008 (normal), radio-antigo @ HOSP-005 (especial), trofeu-mini @ PRACA-014 (lendario), dado-pelucia @ CASA-001 (normal), mapa-tesouro @ RUA-020 x RUA-050 NO (lendario), chaveiro-cobra @ RUA-012 x RUA-044 SO (especial)
+missions: 01-entregas-turbo, 02-sumico-na-cidade, 03-pista-da-cobra, 04-roubaram-o-ana-turbo, 05-turbo-novinho, 06-grande-racha
+encounters: extra-clube-do-trico
 ---
 
-# Missão Vibe Coding
+# Entregas Turbo
 
-Uma aventura bem-humorada pelo universo do Curso em Vídeo, Inteligência Artificial e Vibe Coding.
+Ana Laura e Camila abrem a empresa de entregas mais rápida (e mais atrapalhada) da cidade.
+Um pedido de bolo vira um mistério, o mistério vira perseguição, e tudo termina no Grande Racha.

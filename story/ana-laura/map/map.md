@@ -86,11 +86,11 @@ PRACA-017: Praça São José
 PRACA-018: Praça Santa Luzia
 PRACA-019: Praça Nossa Senhora
 PRACA-020: Praça do Pescador
-PRACA-021: Praça dos Imigrantes
+PRACA-021: Praça da Largada
 PRACA-022: Praça da Juventude
 PRACA-023: Praça do Trabalhador
 PRACA-024: Praça da Cultura
-PRACA-025: Praça da Música
+PRACA-025: Praça da Música (território das Serpentes)
 PRACA-026: Praça dos Esportes
 PRACA-027: Praça da Paz
 PRACA-028: Praça da Amizade
@@ -127,7 +127,7 @@ COM-020: Relojoaria Bom Preço
 COM-021: Ótica Bom Preço
 COM-022: Floricultura Bom Preço
 COM-023: Banca de Jornal Bom Preço
-COM-024: Lavanderia Bom Preço
+COM-024: Delegacia da Detetive Rosa
 COM-025: Auto Peças Bom Preço
 COM-026: Borracharia Bom Preço
 COM-027: Eletrônica Bom Preço
@@ -657,7 +657,7 @@ COM-550: Joalheria do Bairro
 COM-551: Perfumaria do Bairro
 COM-552: Farmácia Popular
 COM-553: Padaria Popular
-COM-554: Mercado Popular
+COM-554: Oficina do Toninho
 COM-555: Mercadinho Popular
 COM-556: Barbearia Popular
 COM-557: Oficina Popular
@@ -857,7 +857,7 @@ COM-750: Joalheria Vitória
 COM-751: Perfumaria Vitória
 
 ## Casas
-CASA-001: Casa da Família Silva
+CASA-001: Casa da Ana e da Camila
 CASA-002: Casa do Mauro
 CASA-003: Casa do Mauro Santos
 CASA-004: Casa do Silva Santos
@@ -898,7 +898,7 @@ CASA-038: Casa do Moreira Santos
 CASA-039: Casa do Ferreira Santos
 CASA-040: Casa do Duarte Santos
 CASA-041: Casa do Fonseca Santos
-CASA-042: Casa do Machado Santos
+CASA-042: Casa da Dona Zuzu
 CASA-043: Casa do Azevedo Santos
 CASA-044: Casa do Cunha Santos
 CASA-045: Casa do Lopes Santos
@@ -919,7 +919,7 @@ CASA-059: Casa do Gabriel Santos
 CASA-060: Casa do Helena Santos
 CASA-061: Casa do Igor Santos
 CASA-062: Casa do Juliana Santos
-CASA-063: Sede da Hostnet
+CASA-063: Clube do Tricô
 CASA-064: Casa do Mariana Santos
 CASA-065: Casa do Nícolas Santos
 CASA-066: Casa do Patrícia Santos
@@ -1209,7 +1209,7 @@ CASA-349: Residência Thiago Teixeira
 CASA-350: Residência Vanessa Teixeira
 CASA-351: Residência Bruno Teixeira
 CASA-352: Residência Larissa Teixeira
-CASA-353: Residência Mauro Fonseca
+CASA-353: Mirante — Linha de Chegada
 CASA-354: Residência Silva Fonseca
 CASA-355: Residência Oliveira Fonseca
 CASA-356: Residência Santos Fonseca
@@ -1512,7 +1512,7 @@ CASA-652: Casa de Monteiro Thiago
 CASA-653: Casa de Mendes Thiago
 CASA-654: Casa de Barros Thiago
 CASA-655: Casa de Freitas Thiago
-CASA-656: Casa de Barbosa Thiago
+CASA-656: Galpão Abandonado
 CASA-657: Casa de Pinto Thiago
 CASA-658: Casa de Moura Thiago
 CASA-659: Casa de Cavalcanti Thiago

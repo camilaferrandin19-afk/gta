@@ -1,7 +1,7 @@
 ---
 id: camila
 name: Camila
-profile: Parceira da Ana Laura, estrategista do estúdio e guardiã dos segredos da equipe.
+profile: Sócia da Ana Laura na Entregas Turbo — cuida do mapa, dos clientes e das ideias malucas.
 traits: Organizada, corajosa, sarcástica na medida certa
 skin_color: #f3cda6
 sleeve_color: #2c6a43

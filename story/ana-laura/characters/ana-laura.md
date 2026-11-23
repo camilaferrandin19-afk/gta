@@ -1,7 +1,7 @@
 ---
 id: ana-laura
 name: Ana Laura
-profile: Motorista destemida que conhece cada rua e atalho da ilha.
+profile: Motorista destemida e sócia da Entregas Turbo. Conhece cada rua e atalho da cidade.
 traits: Ágil, esperta, boa no volante
 skin_color: #f3cda6
 sleeve_color: #ededea
@@ -11,5 +11,5 @@ sprite_top: assets/ana-laura-top.svg
 sprite_front: assets/ana-laura-front.svg
 sprite_left: assets/ana-laura-left.svg
 sprite_right: assets/ana-laura-right.svg
-sprite_cutscene: assets/retrato-ana-laura.png
+sprite_cutscene: assets/retrato-ana-laura-v2.png
 ---
