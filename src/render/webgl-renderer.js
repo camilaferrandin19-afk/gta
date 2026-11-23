@@ -117,6 +117,9 @@ export class WebGLRenderer {
     this.locCamera = gl.getUniformLocation(program, 'u_camera');
     this.locZoom = gl.getUniformLocation(program, 'u_zoom');
     this.zoom = 1.22;
+    // Visão 2.5D (prédios em 3D); a tecla V alterna
+    this.view3d = true;
+    try { this.view3d = localStorage.getItem('gta-visao-3d') !== '0'; } catch { /* sem storage */ }
   }
 
   #initBuffers() {
@@ -173,6 +176,7 @@ export class WebGLRenderer {
     const sky = this.dayCycle.sample(time);
     const insideFactor = player.insideLocationCode ? 0.35 : 1;
     const darkness = sky.darkness * insideFactor;
+    this.lastDarkness = darkness;
     const lights = sky.lights;
 
     const viewW = (this.viewWidth || 800) / this.zoom;
@@ -210,6 +214,11 @@ export class WebGLRenderer {
       const glow = (x, y, size, rgb, a, tex = 'glow') => {
         this.#pushQuad(x - size * 0.5, y - size * 0.5, size, size, 0, tex, [rgb[0], rgb[1], rgb[2], a * lights]);
       };
+
+      // Janelas acesas dos prédios em 3D
+      for (const wl of this.windowLights || []) {
+        if (inView(wl.x, wl.y, 40)) glow(wl.x, wl.y, 38, [1, 0.78, 0.42], 0.95);
+      }
 
       // Postes nas esquinas dos quarteirões e luz das portas
       const lamp = [1, 0.8, 0.48];
@@ -371,6 +380,106 @@ export class WebGLRenderer {
     this.gl.viewport(0, 0, w, h);
     this.viewWidth = width;
     this.viewHeight = height;
+  }
+
+  // ---- Visão 2.5D (estilo GTA 2) ----
+  // Um ponto a uma altura z "sobe" em direção à câmera: afasta-se do centro da tela.
+  #project(x, y, z, camera) {
+    const s = CAMERA_HEIGHT / (CAMERA_HEIGHT - z);
+    return [camera.x + (x - camera.x) * s, camera.y + (y - camera.y) * s];
+  }
+
+  // Quadrilátero livre (4 cantos) com uma região do atlas
+  #pushQuadPts(p0, p1, p2, p3, uvName, rgba) {
+    if (this.quadCount >= this.maxQuads) return;
+    const uv = this.uvs[uvName] || this.uvs.solid;
+    const [r, g, b, a] = rgba;
+    const d = this.vertexData;
+    let i = this.quadCount * 6 * this.floatsPerVertex;
+    const w = (p, u, v) => {
+      d[i++] = p[0]; d[i++] = p[1];
+      d[i++] = u; d[i++] = v;
+      d[i++] = r; d[i++] = g; d[i++] = b; d[i++] = a;
+    };
+    w(p0, uv.u0, uv.v0); w(p1, uv.u1, uv.v0); w(p2, uv.u1, uv.v1);
+    w(p0, uv.u0, uv.v0); w(p2, uv.u1, uv.v1); w(p3, uv.u0, uv.v1);
+    this.quadCount++;
+  }
+
+  // Desenha as fachadas visíveis do prédio e devolve o telhado já projetado na altura certa
+  #drawBuildingWalls(roof, camera, ra) {
+    const H = buildingHeight(roof);
+    const x0 = roof.x;
+    const y0 = roof.y;
+    const x1 = roof.x + roof.w;
+    const y1 = roof.y + roof.h;
+    const [rr, rg, rb] = roof.color;
+    // fachada: mistura a cor do telhado com um tom de reboco claro
+    const base = [rr * 0.45 + 0.86 * 0.55, rg * 0.45 + 0.82 * 0.55, rb * 0.45 + 0.75 * 0.55];
+    const night = this.lastDarkness || 0;
+    const faces = [];
+    if (camera.y > y1) faces.push({ a: [x0, y1], b: [x1, y1], shade: 0.97, side: 'south' });
+    if (camera.y < y0) faces.push({ a: [x1, y0], b: [x0, y0], shade: 0.68, side: 'north' });
+    if (camera.x > x1) faces.push({ a: [x1, y1], b: [x1, y0], shade: 0.82, side: 'east' });
+    if (camera.x < x0) faces.push({ a: [x0, y0], b: [x0, y1], shade: 0.9, side: 'west' });
+
+    const at = (f, t, z) => this.#project(f.a[0] + (f.b[0] - f.a[0]) * t, f.a[1] + (f.b[1] - f.a[1]) * t, z, camera);
+    for (const f of faces) {
+      const col = [base[0] * f.shade, base[1] * f.shade, base[2] * f.shade, ra];
+      this.#pushQuadPts(at(f, 0, 0), at(f, 1, 0), at(f, 1, H), at(f, 0, H), 'solid', col);
+      // faixa escura no pé da parede (sombra de contato) e friso no topo
+      this.#pushQuadPts(at(f, 0, 0), at(f, 1, 0), at(f, 1, 4), at(f, 0, 4), 'solid', [0, 0, 0, 0.28 * ra]);
+      const trim = [rr * 0.7, rg * 0.7, rb * 0.7, ra];
+      this.#pushQuadPts(at(f, 0, H - 5), at(f, 1, H - 5), at(f, 1, H), at(f, 0, H), 'solid', trim);
+
+      // janelas por andar (acendem à noite)
+      const len = Math.hypot(f.b[0] - f.a[0], f.b[1] - f.a[1]);
+      const floors = Math.max(1, Math.floor((H - 8) / 26));
+      const cols = Math.max(1, Math.floor((len - 12) / 30));
+      const winW = 12 / len;
+      for (let fl = 0; fl < floors; fl++) {
+        const z0 = 9 + fl * 26;
+        const z1 = z0 + 13;
+        for (let c = 0; c < cols; c++) {
+          const tc = (c + 0.5) / cols;
+          const t0 = tc - winW / 2;
+          const t1 = tc + winW / 2;
+          const lit = night > 0.25 && hash2(roof.x + c * 13, roof.y + fl * 7 + f.shade * 100) > 0.45;
+          if (lit && ra > 0.5) {
+            const [wx, wy] = at(f, tc, (z0 + z1) / 2);
+            this.windowLights.push({ x: wx, y: wy });
+          }
+          const glass = lit
+            ? [1, 0.84, 0.48, ra]
+            : [0.2 * f.shade + 0.08, 0.3 * f.shade + 0.1, 0.42 * f.shade + 0.12, ra];
+          this.#pushQuadPts(at(f, t0, z0), at(f, t1, z0), at(f, t1, z1), at(f, t0, z1), 'solid', glass);
+          if (!lit) {
+            // reflexo no vidro
+            this.#pushQuadPts(at(f, t0, z1 - 4), at(f, t0 + winW * 0.45, z1 - 4), at(f, t0 + winW * 0.45, z1), at(f, t0, z1), 'solid', [1, 1, 1, 0.22 * ra]);
+          }
+        }
+      }
+
+      // porta na fachada de entrada
+      if (roof.doormat && roof.doorSide === f.side) {
+        const dm = roof.doormat;
+        const vertical = f.side === 'east' || f.side === 'west';
+        const d0 = vertical ? dm.y : dm.x;
+        const d1 = vertical ? dm.y + dm.h : dm.x + dm.w;
+        const e0 = vertical ? f.a[1] : f.a[0];
+        const e1 = vertical ? f.b[1] : f.b[0];
+        const ta = (d0 - e0) / (e1 - e0);
+        const tb = (d1 - e0) / (e1 - e0);
+        const t0 = Math.max(0, Math.min(ta, tb));
+        const t1 = Math.min(1, Math.max(ta, tb));
+        this.#pushQuadPts(at(f, t0, 0), at(f, t1, 0), at(f, t1, 22), at(f, t0, 22), 'solid', [0.3, 0.2, 0.12, ra]);
+        this.#pushQuadPts(at(f, t0 - 0.02, 22), at(f, t1 + 0.02, 22), at(f, t1 + 0.02, 27), at(f, t0 - 0.02, 27), 'solid', [0.85, 0.2, 0.2, ra]);
+      }
+    }
+
+    const [px0, py0] = this.#project(x0, y0, H, camera);
+    const [px1, py1] = this.#project(x1, y1, H, camera);
+    return { ...roof, x: px0, y: py0, w: px1 - px0, h: py1 - py0 };
   }
 
   // Mureta (platibanda) com luz e sombra + caixas de ar-condicionado, claraboias e caixa d'água
@@ -740,6 +849,10 @@ export class WebGLRenderer {
             color: [baseRoofColor[0], baseRoofColor[1], baseRoofColor[2], baseRoofColor[3] * roofAlpha],
             alpha: roofAlpha,
             isHospital: building.type === 'hospital',
+            code: building.code,
+            type: building.type,
+            doorSide: building.doorSide,
+            doormat: building.doormat,
             isEncounter,
             roofLogo: encounterMeta?.roofLogo || '',
           });
@@ -1174,8 +1287,39 @@ export class WebGLRenderer {
     }
 
     // Telhados fechados cobrem pessoas dentro dos prédios quando o jogador está fora
-    for (const roof of closedRoofs) {
-      const ra = roof.alpha ?? 1;
+    // Copas das árvores por cima das pessoas (ficam transparentes quando a protagonista passa embaixo)
+    for (const t of visibleTrees) {
+      const d = Math.hypot(player.x - t.x, player.y - t.y);
+      const alpha = d < t.r + 16 ? 0.38 : 1;
+      const sway = Math.sin(time * 1.3 + t.x * 0.05) * 0.04;
+      if (this.view3d) {
+        // copa no alto: tronco ligando o chão até a copa projetada
+        const z = t.bush ? 10 : 34;
+        const [cx, cy] = this.#project(t.x, t.y, z, camera);
+        const k = CAMERA_HEIGHT / (CAMERA_HEIGHT - z);
+        if (!t.bush) {
+          const ang = Math.atan2(cy - t.y, cx - t.x);
+          const len = Math.hypot(cx - t.x, cy - t.y);
+          if (len > 1) this.#pushQuad((t.x + cx) / 2 - len / 2, (t.y + cy) / 2 - 3, len, 6, ang, 'solid', [0.4, 0.27, 0.15, alpha]);
+        }
+        const s = t.r * 2.3 * k;
+        this.#pushQuad(cx - s * 0.5, cy - s * 0.5, s, s, t.rot + sway, t.uv, [1, 1, 1, alpha]);
+      } else {
+        const s = t.r * 2.3;
+        this.#pushQuad(t.x - s * 0.5, t.y - s * 0.5, s, s, t.rot + sway, t.uv, [1, 1, 1, alpha]);
+      }
+    }
+
+    this.windowLights = [];
+    // Visão 2.5D: prédios mais distantes da câmera primeiro, para os mais perto ficarem na frente
+    const roofOrder = this.view3d
+      ? [...closedRoofs].sort((a, b) =>
+        Math.hypot(b.x + b.w / 2 - camera.x, b.y + b.h / 2 - camera.y) -
+        Math.hypot(a.x + a.w / 2 - camera.x, a.y + a.h / 2 - camera.y))
+      : closedRoofs;
+    for (const flatRoof of roofOrder) {
+      const ra = flatRoof.alpha ?? 1;
+      const roof = this.view3d ? this.#drawBuildingWalls(flatRoof, camera, ra) : flatRoof;
       this.#pushQuad(roof.x, roof.y, roof.w, roof.h, 0, 'roof', roof.color);
       this.#drawRoofDetails(roof, ra);
       if (roof.isHospital) {
@@ -1217,15 +1361,6 @@ export class WebGLRenderer {
           this.#pushQuad(cx - dotSize * 0.5, topY + barH + gap, dotSize, dotSize, 0, 'disc', white);
         }
       }
-    }
-
-    // Copas das árvores por cima das pessoas (ficam transparentes quando a protagonista passa embaixo)
-    for (const t of visibleTrees) {
-      const d = Math.hypot(player.x - t.x, player.y - t.y);
-      const alpha = d < t.r + 16 ? 0.38 : 1;
-      const s = t.r * 2.3;
-      const sway = Math.sin(time * 1.3 + t.x * 0.05) * 0.04;
-      this.#pushQuad(t.x - s * 0.5, t.y - s * 0.5, s, s, t.rot + sway, t.uv, [1, 1, 1, alpha]);
     }
 
     // Ondas circulares estilo sinal Wi-Fi ao redor do personagem de destino (visíveis mesmo com teto fechado)
@@ -1692,4 +1827,18 @@ function blockDecor(block) {
   decor = { trees };
   decorCache.set(block, decor);
   return decor;
+}
+
+// ---- Altura dos prédios na visão 2.5D ----
+const CAMERA_HEIGHT = 470;
+function hash2(a, b) {
+  let h = (Math.round(a) * 374761393 + Math.round(b) * 668265263) >>> 0;
+  h = Math.imul(h ^ (h >>> 13), 1274126177) >>> 0;
+  return (h ^ (h >>> 16)) / 4294967296;
+}
+function buildingHeight(roof) {
+  const r = hash2(roof.x, roof.y);
+  if (roof.isHospital || roof.type === 'hospital') return 120;
+  if (roof.type === 'house') return 40 + Math.round(r * 2) * 24; // 1 a 3 andares
+  return 66 + Math.round(r * 3) * 26; // comércio: 2 a 5 andares
 }

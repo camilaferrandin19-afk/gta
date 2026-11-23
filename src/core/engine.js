@@ -3,7 +3,7 @@ import { RoadPathfinder } from '../world/pathfinding.js';
 import { TrafficManager } from '../world/traffic-manager.js?v=24';
 import { BoatManager } from '../world/boat-manager.js?v=17';
 import { InputManager } from '../input/input-manager.js?v=21';
-import { WebGLRenderer } from '../render/webgl-renderer.js?v=44';
+import { WebGLRenderer } from '../render/webgl-renderer.js?v=50';
 import { isInWater, resolveCircleStaticObstacle, resolveEntityCollisions, resolveVehiclePairCollision } from '../physics/collision.js?v=11';
 import {
   applyPedestrianDamage,
@@ -209,6 +209,11 @@ export class Engine {
           cycleWeapon(this.weapons.arsenal, 1);
         } else if (e.code === 'KeyR') {
           startReload(this.weapons.arsenal);
+        } else if (e.code === 'KeyV' && !e.repeat) {
+          // Troca a visão: 2D (de cima) ou 2.5D (prédios em 3D)
+          this.renderer.view3d = !this.renderer.view3d;
+          try { localStorage.setItem('gta-visao-3d', this.renderer.view3d ? '1' : '0'); } catch { /* sem storage */ }
+          this.hud.showToast(this.renderer.view3d ? 'Visão 3D (prédios com altura) · V troca' : 'Visão 2D (de cima) · V troca', 2200);
         }
       }
       if (e.key === 'i' || e.key === 'I' || e.key === 'Tab') {

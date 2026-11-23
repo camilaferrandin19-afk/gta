@@ -1405,6 +1405,7 @@ export class HudController {
         [['F'], 'Entrar no veículo'],
         [['I'], 'Inventário'],
         [['M'], 'Mapa'],
+        [['V'], 'Visão 2D/3D'],
         [['+', '−'], 'Zoom'],
       ]
       : [
