@@ -3,7 +3,7 @@ import { RoadPathfinder } from '../world/pathfinding.js';
 import { TrafficManager } from '../world/traffic-manager.js?v=24';
 import { BoatManager } from '../world/boat-manager.js?v=17';
 import { InputManager } from '../input/input-manager.js?v=21';
-import { WebGLRenderer } from '../render/webgl-renderer.js?v=38';
+import { WebGLRenderer } from '../render/webgl-renderer.js?v=41';
 import { isInWater, resolveCircleStaticObstacle, resolveEntityCollisions, resolveVehiclePairCollision } from '../physics/collision.js?v=11';
 import {
   applyPedestrianDamage,
@@ -35,11 +35,12 @@ import {
   createArsenal, cycleWeapon, giveAllWeapons, giveWeapon, selectWeapon, startReload, stepBullets, tickArsenal, tryFire, WEAPONS, WEAPON_ORDER,
 } from './weapons.js?v=1';
 import {
-  clearWanted, createWanted, desiredPoliceCars, driveToward, gridRoute, policeShoots, POLICE_PROFILE, reportCrime, stars as wantedStars, tickWanted,
-} from './police.js?v=1';
+  clearWanted, createWanted, CRIMES, desiredPoliceCars, driveToward, gridRoute, POLICE_PROFILE, reportCrime, stars as wantedStars, tickWanted,
+} from './police.js?v=2';
 import {
   addMoney, collectibleReward, comboActive, createWallet, GARAGE_SHOP, GUN_SHOP, missionReward, multiplierFor, PAINT_COLORS, REWARDS, spend, tickCombo,
 } from './economy.js?v=2';
+import { getDifficulty, loadDifficultyId, policeCarsFor, saveDifficultyId } from './difficulty.js?v=1';
 
 // Logos dos telhados das lojas (SVG embutido)
 const svgData = (svg) => `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
@@ -277,6 +278,7 @@ export class Engine {
     this.hud.clearNpcSpeechBubbles?.();
     this.running = false;
     if (this.#onKeyDown) window.removeEventListener('keydown', this.#onKeyDown);
+    if (this.onDifficultyEvent) window.removeEventListener('gta-difficulty', this.onDifficultyEvent);
     if (this.#onResize) window.removeEventListener('resize', this.#onResize);
     if (this.#onPageHide) window.removeEventListener('pagehide', this.#onPageHide);
     if (this.#onVisibilityChange) document.removeEventListener('visibilitychange', this.#onVisibilityChange);
@@ -786,7 +788,8 @@ export class Engine {
   applyDamage(amount, fatalReason = 'Você se deu mal!', { bypassResistance = false, bypassKnockdown = false } = {}) {
     if (this.player.isDead || amount <= 0) return;
     if (!bypassKnockdown && (this.player.knockdownTimer || 0) > 0) return;
-    const effectiveDamage = bypassResistance ? amount : Math.max(1, Math.round(amount * 0.55));
+    const diffMult = this.difficulty?.damageTaken ?? 1;
+    const effectiveDamage = Math.max(1, Math.round((bypassResistance ? amount : amount * 0.55) * diffMult));
     this.player.health = Math.max(0, this.player.health - effectiveDamage);
     this.hud.triggerDamageFlash();
     if (this.player.health <= 0) {
@@ -2394,7 +2397,22 @@ export class Engine {
   }
 
   // ---- Polícia e nível de procurado ----
+  /** Troca o nível de dificuldade (Fácil / Normal / Difícil). */
+  setDifficulty(id) {
+    this.difficulty = getDifficulty(id);
+    saveDifficultyId(this.difficulty.id);
+    return this.difficulty;
+  }
+
   #initPolice() {
+    this.difficulty = getDifficulty(loadDifficultyId());
+    if (!this.onDifficultyEvent) {
+      this.onDifficultyEvent = (ev) => {
+        const d = this.setDifficulty(ev.detail?.id);
+        this.hud.showToast?.(`Dificuldade: ${d.label}`, 2000);
+      };
+      window.addEventListener('gta-difficulty', this.onDifficultyEvent);
+    }
     this.wanted = createWanted();
     this.policeCars = [];
     this.policeBullets = [];
@@ -2406,7 +2424,8 @@ export class Engine {
   /** Registra um crime da protagonista. */
   policeCrime(type) {
     if (!this.wanted) return;
-    const gained = reportCrime(this.wanted, type);
+    const mult = this.difficulty?.crimeMult ?? 1;
+    const gained = reportCrime(this.wanted, type, (CRIMES[type] ?? 0) * mult);
     if (gained > 0) {
       this.hud.flashWanted?.();
       this.partnerSay('police');
@@ -2491,7 +2510,7 @@ export class Engine {
     // Reforços conforme as estrelas
     this.policeSpawnTimer = Math.max(0, this.policeSpawnTimer - dt);
     const active = this.policeCars.filter((c) => !c.destroyed).length;
-    if (active < desiredPoliceCars(level) && this.policeSpawnTimer <= 0) {
+    if (active < policeCarsFor(desiredPoliceCars(level), level, this.difficulty) && this.policeSpawnTimer <= 0) {
       this.#spawnPoliceCar(target);
       this.policeSpawnTimer = 2.2;
     }
@@ -2539,9 +2558,9 @@ export class Engine {
 
       // A partir de 3 estrelas, atiram
       car.shootCooldown -= dt;
-      if (policeShoots(level) && d < 330 && car.shootCooldown <= 0) {
+      if (level >= this.difficulty.shootFromStars && d < 330 && car.shootCooldown <= 0) {
         car.shootCooldown = 0.8 + Math.random() * 0.6;
-        const a = Math.atan2(target.y - car.y, target.x - car.x) + (Math.random() - 0.5) * 0.22;
+        const a = Math.atan2(target.y - car.y, target.x - car.x) + (Math.random() - 0.5) * this.difficulty.policeSpread;
         const ox = car.x + Math.cos(a) * 20;
         const oy = car.y + Math.sin(a) * 20;
         this.policeBullets.push({
@@ -2563,14 +2582,14 @@ export class Engine {
         this.weaponFx.push({ kind: imp.type === 'wall' ? 'spark' : 'hit', x: imp.x, y: imp.y, angle: 0, life: 0, maxLife: 0.25 });
         if (imp.type === 'ped') this.applyDamage(imp.damage, 'A polícia te pegou!');
         if (imp.type === 'vehicle') {
-          imp.target.health = Math.max(0, (imp.target.health ?? 100) - imp.damage * 0.5);
+          imp.target.health = Math.max(0, (imp.target.health ?? 100) - imp.damage * 0.5 * this.difficulty.damageTaken);
           if (imp.target.health <= 0) this.#triggerVehicleExplosion(imp.target);
         }
       }
     }
 
     // Fuga
-    const ev = tickWanted(w, dt, seen);
+    const ev = tickWanted(w, dt, seen, this.difficulty.escapeMult);
     if (ev === 'escaped') {
       this.hud.showToast('Você despistou a polícia!', 3000);
       this.partnerSay('escaped', { force: true });
@@ -2587,7 +2606,7 @@ export class Engine {
 
   #busted(currentVehicle) {
     this.bustTimer = 0;
-    const penalty = Math.min(this.wallet.money, Math.max(100, Math.round(this.wallet.money * 0.1)));
+    const penalty = Math.min(this.wallet.money, Math.max(100, Math.round(this.wallet.money * this.difficulty.bustPenalty)));
     spend(this.wallet, penalty);
     this.#saveEconomy();
     clearWanted(this.wanted);
@@ -2663,7 +2682,8 @@ export class Engine {
   }
 
   #earn(amount, label) {
-    const v = addMoney(this.wallet, amount);
+    const mult = amount > 0 ? (this.difficulty?.moneyMult ?? 1) : 1;
+    const v = addMoney(this.wallet, Math.round(amount * mult));
     if (v > 0) this.hud.showMoneyGain?.(v, label);
     this.#saveEconomy();
   }
@@ -3100,6 +3120,12 @@ export class Engine {
           try { localStorage.setItem('gta-dica-dirigir', '1'); } catch { /* sem storage */ }
         }
       }
+      // Parada: lembra como sair do veículo
+      if (!this.pendingContextPrompt && !busy && Math.abs(currentVehicle.speed || 0) < 15) {
+        const pos = this.#worldToScreen(currentVehicle.x, currentVehicle.y - 46);
+        const texto = currentVehicle.kind === 'moto' ? 'Descer da moto' : 'Sair do veículo';
+        this.pendingContextPrompt = { keys: ['F'], text: texto, x: pos.x, y: pos.y };
+      }
       return;
     }
     if (busy || this.#isNearInteriorStoryNpc() || this.#isNearPendingTargetNpc() || this.#findNearbyEncounterNpc()) return;
@@ -3323,6 +3349,7 @@ export class Engine {
       explosions: this.explosions,
       worldCollectibles: this.worldCollectibles,
       objectivePoint: hideTargetNpc ? null : this.objectivePoint,
+      gpsPoint: this.freeRoamMode || this.missionOutTriggered ? null : this.objectivePoint,
       objectiveNpcPoint: hideTargetNpc ? null : this.objectiveNpcPoint,
       completedNpcPoints: extraNpcs,
       encounterLocations: this.encounterLocationCodes,

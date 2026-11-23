@@ -3102,3 +3102,57 @@ body {
     height: 110px;
   }
 }
+
+/* ---- Seletor de dificuldade ---- */
+.difficulty-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  margin-top: 12px;
+}
+
+.difficulty-label {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #fbbf24;
+}
+
+.difficulty-options {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+.difficulty-options button {
+  min-height: 38px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: #273244;
+  color: #f8fafc;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.difficulty-options button:hover {
+  border-color: #fbbf24;
+}
+
+.difficulty-options button.active[data-diff="facil"] { background: #15803d; border-color: #4ade80; }
+.difficulty-options button.active[data-diff="normal"] { background: #b45309; border-color: #fbbf24; }
+.difficulty-options button.active[data-diff="dificil"] { background: #991b1b; border-color: #f87171; }
+
+.difficulty-desc {
+  margin: 0;
+  font-size: 13px;
+  color: #cbd5e1;
+  min-height: 1.4em;
+}
+
+.pause-card .difficulty-picker {
+  margin-top: 4px;
+}

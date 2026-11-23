@@ -58,8 +58,8 @@ function hexToRgb01(hex, fallback = [0.945, 0.761, 0.49]) {
 export class WebGLRenderer {
   constructor(canvas) {
     this.canvas = canvas;
-    const gl = canvas.getContext('webgl', { alpha: false, antialias: false }) ||
-               canvas.getContext('experimental-webgl', { alpha: false, antialias: false });
+    const gl = canvas.getContext('webgl', { alpha: false, antialias: true }) ||
+               canvas.getContext('experimental-webgl', { alpha: false, antialias: true });
 
     if (!gl) {
       throw new Error('[WebGL] WebGL não está disponível neste navegador ou dispositivo.');
@@ -145,7 +145,7 @@ export class WebGLRenderer {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, atlas.canvas);
     this.customTextures = new Map();
   }
@@ -482,7 +482,7 @@ export class WebGLRenderer {
     this.#pushQuad(x - 4.5, y - 2, 9, 9, 0, 'disc', [0.22, 0.14, 0.08, 1]);
   }
 
-  renderFrame({ camera, cityMap, vehicles, boats = [], trashBins = [], pedestrians = [], player, playerSprites = null, partner = null, bullets = [], weaponFx = [], skidMarks, bloodMarks = [], smokeParticles = [], explosions = [], worldCollectibles = [], objectivePoint, objectiveNpcPoint, completedNpcPoints = [], encounterLocations = null, emitNpcWaves = false, time }) {
+  renderFrame({ camera, cityMap, vehicles, boats = [], trashBins = [], pedestrians = [], player, playerSprites = null, partner = null, bullets = [], weaponFx = [], skidMarks, bloodMarks = [], smokeParticles = [], explosions = [], worldCollectibles = [], objectivePoint, objectiveNpcPoint, gpsPoint = null, completedNpcPoints = [], encounterLocations = null, emitNpcWaves = false, time }) {
     const gl = this.gl;
     this.quadCount = 0;
 
@@ -1158,6 +1158,37 @@ export class WebGLRenderer {
     // Ondas circulares estilo sinal Wi-Fi ao redor do personagem de destino (visíveis mesmo com teto fechado)
     if (npcMarker && emitNpcWaves) {
       this.#drawNpcWaves(npcMarker.x, npcMarker.y, time);
+    }
+
+    // GPS: seta amarela girando em volta da protagonista, apontando para o objetivo
+    const gpsTarget = gpsPoint || objectivePoint || objectiveNpcPoint;
+    if (gpsTarget && this.showGpsArrow !== false) {
+      const dx = gpsTarget.x - camera.x;
+      const dy = gpsTarget.y - camera.y;
+      const dist = Math.hypot(dx, dy);
+      if (dist > 220) {
+        const angle = Math.atan2(dy, dx);
+        const radius = (player.inVehicleId ? 62 : 44) + Math.sin(time * 5) * 3;
+        const cos = Math.cos(angle);
+        const sin = Math.sin(angle);
+        const ax = camera.x + cos * radius;
+        const ay = camera.y + sin * radius;
+        const fade = Math.min(1, (dist - 220) / 160);
+        const gpsColor = [1, 0.8, 0.12, 0.85 * fade];
+        const gpsOutline = [0.08, 0.06, 0.02, 0.55 * fade];
+        const part = (lx, ly, w, h, rot, color) => {
+          const wx = ax + cos * lx - sin * ly;
+          const wy = ay + sin * lx + cos * ly;
+          this.#pushQuad(wx - w * 0.5, wy - h * 0.5, w, h, angle + rot, 'solid', color);
+        };
+        // contorno escuro (um pouco maior) e depois a seta
+        part(-4, 0, 16, 9, 0, gpsOutline);
+        part(5, -5, 16, 8, 0.75, gpsOutline);
+        part(5, 5, 16, 8, -0.75, gpsOutline);
+        part(-4, 0, 13, 6, 0, gpsColor);
+        part(5, -5, 13, 5, 0.75, gpsColor);
+        part(5, 5, 13, 5, -0.75, gpsColor);
+      }
     }
 
     // Jogador a pé ou montado em moto (que não possui teto)

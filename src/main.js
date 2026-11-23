@@ -1,4 +1,4 @@
-import { Engine } from './core/engine.js?v=71';
+import { Engine } from './core/engine.js?v=74';
 import { HudController } from './ui/hud-controller.js?v=48';
 import { CutsceneController } from './ui/cutscene-controller.js?v=15';
 import { PauseMenuController } from './ui/pause-menu.js?v=6';
@@ -6,6 +6,7 @@ import { StorySelectorController } from './ui/story-selector.js?v=1';
 import { ConfirmDialogController } from './ui/confirm-dialog.js?v=2';
 import { AssetsRefreshDialogController } from './ui/assets-refresh-dialog.js?v=2';
 import { InventoryController } from './ui/inventory-controller.js?v=21';
+import { initDifficultyPickers } from './ui/difficulty-picker.js?v=1';
 import { CityMap } from './world/city-map.js?v=30';
 import {
   loadGameState,
@@ -37,6 +38,7 @@ async function boot() {
   const confirmDialog = new ConfirmDialogController();
   const assetsRefreshDialog = new AssetsRefreshDialogController();
   const pauseMenu = new PauseMenuController(confirmDialog, assetsRefreshDialog);
+  initDifficultyPickers();
   const storySelector = new StorySelectorController();
   const inventoryController = new InventoryController();
   window.__gameBooted = true;

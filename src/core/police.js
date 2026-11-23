@@ -47,7 +47,7 @@ export function escapeTime(level) {
  * Avança o tempo. seen = alguma viatura enxerga a protagonista.
  * Retorna 'lost-star' | 'escaped' | null.
  */
-export function tickWanted(w, dt, seen) {
+export function tickWanted(w, dt, seen, escapeMult = 1) {
   const level = stars(w);
   w.seenRecently = seen;
   if (level === 0) {
@@ -63,7 +63,7 @@ export function tickWanted(w, dt, seen) {
   }
   w.unseen += dt;
   w.flash = true;
-  if (w.unseen >= escapeTime(level)) {
+  if (w.unseen >= escapeTime(level) * escapeMult) {
     w.unseen = 0;
     w.heat = level - 1;
     return level - 1 === 0 ? 'escaped' : 'lost-star';
