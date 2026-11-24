@@ -1,6 +1,13 @@
 // Visão 3D completa (Three.js): cidade, veículos e pessoas em 3D com câmera atrás.
 // Coordenadas: o jogo usa (x, y) no plano; aqui vira (x, altura, y) — eixo Z do Three = y do jogo.
-import * as THREE from '../../vendor/three/three.module.min.js';
+import * as THREE from 'three';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { Sky } from 'three/addons/objects/Sky.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { blockDecor, buildingHeight } from './webgl-renderer.js?v=51';
 
 const BLOCK_RADIUS = 1500; // distância (em unidades do mundo) em que a cidade é montada
@@ -53,13 +60,37 @@ export class Renderer3D {
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.05;
+    this.renderer.toneMappingExposure = 0.9;
 
     this.scene = new THREE.Scene();
-    this.scene.fog = new THREE.Fog(0x9cc8ef, 900, 2600);
-    this.camera = new THREE.PerspectiveCamera(58, 1, 2, 6000);
+    this.scene.fog = new THREE.Fog(0xbfd8ee, 1100, 3200);
+
+    // reflexos (pintura dos carros, vidros) a partir de um ambiente iluminado
+    const pmrem = new THREE.PMREMGenerator(this.renderer);
+    this.scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    pmrem.dispose();
+
+    // céu físico (sol, horizonte, entardecer)
+    this.sky = new Sky();
+    this.sky.scale.setScalar(4200);
+    const su = this.sky.material.uniforms;
+    su.turbidity.value = 5;
+    su.rayleigh.value = 1.4;
+    su.mieCoefficient.value = 0.004;
+    su.mieDirectionalG.value = 0.82;
+    this.scene.add(this.sky);
+    this.sunDir = new THREE.Vector3(0.4, 0.8, 0.3);
+    this.camera = new THREE.PerspectiveCamera(58, 1, 2, 9000);
     this.camPos = null;
     this.camLook = new THREE.Vector3();
+
+    // pós-processamento: brilho (bloom) nas luzes + saída com tone mapping
+    const rt = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: 4 });
+    this.composer = new EffectComposer(this.renderer, rt);
+    this.composer.addPass(new RenderPass(this.scene, this.camera));
+    this.bloom = new UnrealBloomPass(new THREE.Vector2(512, 512), 0.35, 0.5, 0.86);
+    this.composer.addPass(this.bloom);
+    this.composer.addPass(new OutputPass());
 
     this.hemi = new THREE.HemisphereLight(0xdfefff, 0x4a4a40, 1.2);
     this.scene.add(this.hemi);
@@ -78,6 +109,11 @@ export class Renderer3D {
     this.scene.add(this.headlight.target);
 
     this.#buildMaterials();
+    // texturas fotográficas (Poly Haven, CC0) — o motor espera isto antes de mostrar o 3D
+    this.ready = Promise.all([
+      this.#loadPhotoTextures().catch((err) => console.warn('[3D] Texturas fotográficas indisponíveis:', err)),
+      this.#loadCarModels().catch((err) => console.warn('[3D] Modelos de carro indisponíveis:', err)),
+    ]);
     this.blockGroups = new Map();
     this.vehicleMeshes = new Map();
     this.pedMeshes = new Map();
@@ -142,8 +178,8 @@ export class Renderer3D {
     });
 
     this.mat = {
-      asphalt: new THREE.MeshLambertMaterial({ map: asphalt }),
-      sidewalk: new THREE.MeshLambertMaterial({ map: sidewalk }),
+      asphalt: new THREE.MeshStandardMaterial({ map: asphalt, roughness: 0.92, metalness: 0 }),
+      sidewalk: new THREE.MeshStandardMaterial({ map: sidewalk, roughness: 0.85, metalness: 0 }),
       grass: new THREE.MeshLambertMaterial({ map: grass }),
       water: new THREE.MeshPhongMaterial({ color: 0x2e7fb8, shininess: 80, specular: 0x88bbff }),
       stripe: new THREE.MeshBasicMaterial({ color: 0xf2c838 }),
@@ -156,7 +192,7 @@ export class Renderer3D {
         new THREE.MeshLambertMaterial({ color: 0x55993a }),
       ],
       palm: new THREE.MeshLambertMaterial({ color: 0x3fa84a, side: THREE.DoubleSide }),
-      glass: new THREE.MeshStandardMaterial({ color: 0x1b2635, metalness: 0.6, roughness: 0.15 }),
+      glass: new THREE.MeshStandardMaterial({ color: 0x0f1620, metalness: 0.9, roughness: 0.06, envMapIntensity: 1.6 }),
       tire: new THREE.MeshLambertMaterial({ color: 0x141518 }),
       chrome: new THREE.MeshStandardMaterial({ color: 0xc9ced5, metalness: 0.9, roughness: 0.25 }),
       headlight: new THREE.MeshBasicMaterial({ color: 0xfff6cf }),
@@ -172,6 +208,20 @@ export class Renderer3D {
       fire: new THREE.MeshBasicMaterial({ color: 0xff8a2a, transparent: true, opacity: 0.8, depthWrite: false }),
       lampPole: new THREE.MeshLambertMaterial({ color: 0x3a3f47 }),
       lampBulb: new THREE.MeshBasicMaterial({ color: 0xfff1c1 }),
+      contact: new THREE.MeshBasicMaterial({
+        color: 0x000000,
+        transparent: true,
+        opacity: 0.55,
+        depthWrite: false,
+        alphaMap: canvasTexture(64, 64, (c, w, h) => {
+          const gr = c.createRadialGradient(w / 2, h / 2, 2, w / 2, h / 2, w / 2);
+          gr.addColorStop(0, '#ffffff');
+          gr.addColorStop(0.55, '#888888');
+          gr.addColorStop(1, '#000000');
+          c.fillStyle = gr;
+          c.fillRect(0, 0, w, h);
+        }, false),
+      }),
     };
     this.roofTex = roof;
 
@@ -185,7 +235,228 @@ export class Renderer3D {
       beacon: new THREE.CylinderGeometry(1, 1, 1, 24, 1, true),
       ring: new THREE.RingGeometry(0.8, 1, 32),
       gem: new THREE.OctahedronGeometry(1),
+      plane: new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2),
     };
+  }
+
+  async #loadPhotoTextures() {
+    const loader = new THREE.TextureLoader();
+    const base = './assets3d/textures/';
+    const load = async (name, srgb) => {
+      const t = await loader.loadAsync(base + name);
+      t.wrapS = THREE.RepeatWrapping;
+      t.wrapT = THREE.RepeatWrapping;
+      t.anisotropy = 8;
+      if (srgb) t.colorSpace = THREE.SRGBColorSpace;
+      return t;
+    };
+    const names = ['asphalt_02', 'concrete_pavement', 'brick_wall_02', 'painted_plaster_wall', 'concrete_floor_02', 'leafy_grass'];
+    const tex = {};
+    await Promise.all(names.map(async (n) => {
+      tex[n] = { diff: await load(`${n}_diff_1k.jpg`, true), nor: await load(`${n}_nor_gl_1k.jpg`, false) };
+    }));
+    this.photo = tex;
+
+    const setMat = (mat, t, normalScale = 0.8) => {
+      mat.map = t.diff;
+      mat.normalMap = t.nor;
+      mat.normalScale = new THREE.Vector2(normalScale, normalScale);
+      mat.color.set(0xffffff);
+      mat.needsUpdate = true;
+    };
+    setMat(this.mat.asphalt, tex.asphalt_02, 0.9);
+    setMat(this.mat.sidewalk, tex.concrete_pavement, 0.9);
+    this.mat.grass = new THREE.MeshStandardMaterial({ roughness: 0.95 });
+    setMat(this.mat.grass, tex.leafy_grass, 1);
+
+    // fachada: foto da parede + janela desenhada por cima (1 janela por célula de 30 x 26)
+    const compose = (img, glass) => {
+      const cv = document.createElement('canvas');
+      cv.width = 128;
+      cv.height = 112;
+      const c = cv.getContext('2d');
+      c.drawImage(img, 0, 0, 300, 262, 0, 0, 128, 112);
+      c.fillStyle = 'rgba(0,0,0,0.18)';
+      c.fillRect(30, 84, 72, 6); // sombra do peitoril
+      c.fillStyle = '#e9e4da';
+      c.fillRect(30, 24, 70, 60); // moldura
+      c.fillRect(26, 82, 78, 6); // peitoril
+      const gr = c.createLinearGradient(34, 28, 96, 80);
+      gr.addColorStop(0, glass[0]);
+      gr.addColorStop(1, glass[1]);
+      c.fillStyle = gr;
+      c.fillRect(34, 28, 62, 52);
+      c.fillStyle = 'rgba(255,255,255,0.28)';
+      c.beginPath(); c.moveTo(38, 76); c.lineTo(58, 30); c.lineTo(70, 30); c.lineTo(50, 76); c.fill();
+      c.fillStyle = '#e9e4da';
+      c.fillRect(63, 28, 4, 52); // divisão da janela
+      const t = new THREE.CanvasTexture(cv);
+      t.colorSpace = THREE.SRGBColorSpace;
+      t.wrapS = THREE.RepeatWrapping;
+      t.wrapT = THREE.RepeatWrapping;
+      t.anisotropy = 8;
+      return t;
+    };
+    this.wallTexHouse = compose(tex.brick_wall_02.diff.image, ['#2b4561', '#4f7396']);
+    this.wallTexShop = compose(tex.painted_plaster_wall.diff.image, ['#24384f', '#5a86ad']);
+    // janela acesa à noite na mesma posição da janela desenhada
+    this.wallLitTex = canvasTexture(128, 112, (c) => {
+      c.fillStyle = '#000';
+      c.fillRect(0, 0, 128, 112);
+      c.fillStyle = '#ffcf7a';
+      c.fillRect(34, 28, 62, 52);
+    });
+  }
+
+  // Carros 3D do Kenney Car Kit (CC0)
+  async #loadCarModels() {
+    const files = {
+      car: 'sedan', 'car-sport': 'sedan-sports', 'car-hatch': 'hatchback-sports', 'car-suv': 'suv',
+      'car-pickup': 'suv-luxury', police: 'police', van: 'van', 'van-delivery': 'delivery', special: 'race',
+    };
+    const img = await new THREE.ImageLoader().loadAsync('./assets3d/cars/Textures/colormap.png');
+    const cv = document.createElement('canvas');
+    cv.width = img.width;
+    cv.height = img.height;
+    const cx = cv.getContext('2d', { willReadFrequently: true });
+    cx.drawImage(img, 0, 0);
+    const px = cx.getImageData(0, 0, cv.width, cv.height).data;
+    const loader = new GLTFLoader();
+    const models = {};
+    await Promise.all(Object.entries(files).map(async ([key, file]) => {
+      const gltf = await loader.loadAsync(`./assets3d/cars/${file}.glb`);
+      const root = gltf.scene;
+      root.updateMatrixWorld(true);
+      const box = new THREE.Box3().setFromObject(root);
+      // cor da carroceria = cor mais usada na malha "body" (para repintar só ela)
+      const count = new Map();
+      root.traverse((o) => {
+        if (!o.isMesh) return;
+        const isBody = /body/i.test(o.name) || /body/i.test(o.parent?.name || '');
+        const uv = o.geometry.attributes.uv;
+        if (!isBody || !uv) return;
+        for (let i = 0; i < uv.count; i++) {
+          const x = Math.min(cv.width - 1, Math.max(0, Math.floor(uv.getX(i) * cv.width)));
+          const y = Math.min(cv.height - 1, Math.max(0, Math.floor(uv.getY(i) * cv.height)));
+          const k = (y * cv.width + x) * 4;
+          const r = px[k];
+          const g = px[k + 1];
+          const b = px[k + 2];
+          if (r + g + b < 90) continue; // pneus, vidros escuros
+          if (Math.max(r, g, b) - Math.min(r, g, b) < 40) continue; // cinzas: frisos, vidros, para-choques
+          const key2 = (r << 16) | (g << 8) | b;
+          count.set(key2, (count.get(key2) || 0) + 1);
+        }
+      });
+      let best = null;
+      let bestN = 0;
+      for (const [k, n] of count) if (n > bestN) { best = k; bestN = n; }
+      const bodyKey = best === null ? null : new THREE.Color().setRGB(((best >> 16) & 255) / 255, ((best >> 8) & 255) / 255, (best & 255) / 255, THREE.SRGBColorSpace);
+      models[key] = { root, box, size: box.getSize(new THREE.Vector3()), center: box.getCenter(new THREE.Vector3()), bodyKey };
+    }));
+    this.carModels = models;
+  }
+
+  // Material do carro: igual ao do modelo, mas a cor da carroceria vira a cor do veículo no jogo
+  #carPaintMaterial(base, bodyKey, color) {
+    const m = base.clone();
+    m.roughness = 0.42;
+    m.metalness = 0.25;
+    m.envMapIntensity = 1.2;
+    const paint = { value: toColor(color) };
+    const dim = { value: 1 };
+    if (bodyKey) {
+      m.onBeforeCompile = (sh) => {
+        sh.uniforms.uPaint = paint;
+        sh.uniforms.uKey = { value: bodyKey };
+        sh.uniforms.uDim = dim;
+        sh.fragmentShader = 'uniform vec3 uPaint;\nuniform vec3 uKey;\nuniform float uDim;\n' + sh.fragmentShader.replace(
+          '#include <map_fragment>',
+          [
+            '#include <map_fragment>',
+            '{',
+            '  vec3 c = diffuseColor.rgb;',
+            '  float mx = max(c.r, max(c.g, c.b));',
+            '  float mn = min(c.r, min(c.g, c.b));',
+            '  float sat = (mx - mn) / max(mx, 1e-4);',
+            // mesmo matiz da carroceria (tons claros e escuros dela) vira a cor do veículo
+            '  if (sat > 0.35 && distance(normalize(c + 1e-4), normalize(uKey + 1e-4)) < 0.16) {',
+            '    float lum = dot(c, vec3(0.2126, 0.7152, 0.0722)) / max(dot(uKey, vec3(0.2126, 0.7152, 0.0722)), 1e-4);',
+            '    diffuseColor.rgb = uPaint * clamp(lum, 0.35, 1.6);',
+            '  }',
+            '}',
+            'diffuseColor.rgb *= uDim;',
+          ].join('\n'),
+        );
+      };
+      m.customProgramCacheKey = () => 'car-paint';
+    }
+    return { material: m, paint, dim };
+  }
+
+  #carModelKey(v) {
+    if (v.police) return 'police';
+    if (v.special) return 'special';
+    if (v.kind === 'van') return v.model === 'Van de Carga' ? 'van-delivery' : 'van';
+    if (v.kind !== 'car') return null;
+    return v.texModel || 'car';
+  }
+
+  #buildVehicleModel(v, key) {
+    const M = this.carModels[key];
+    const g = new THREE.Group();
+    const inst = M.root.clone(true);
+    const alongZ = M.size.z >= M.size.x;
+    const len = alongZ ? M.size.z : M.size.x;
+    const wid = alongZ ? M.size.x : M.size.z;
+    const L = v.length || 60;
+    const W = v.width || 28;
+    const s = Math.min(L / len, (W * 1.12) / wid);
+    const pivot = new THREE.Group();
+    inst.scale.setScalar(s);
+    inst.position.set(-M.center.x * s, -M.box.min.y * s, -M.center.z * s);
+    pivot.add(inst);
+    // os modelos do Kenney apontam a frente para +Z: girar para a frente ficar em +X
+    pivot.rotation.y = alongZ ? Math.PI / 2 : 0;
+    g.add(pivot);
+
+    const recolor = key !== 'police';
+    let paintInfo = null;
+    const wheels = [];
+    inst.traverse((o) => {
+      if (/^wheel/i.test(o.name)) wheels.push(o);
+      if (!o.isMesh) return;
+      o.castShadow = true;
+      o.receiveShadow = true;
+      if (recolor) {
+        if (!paintInfo) paintInfo = this.#carPaintMaterial(o.material, M.bodyKey, v.color);
+        o.material = paintInfo.material;
+      }
+    });
+    const topY = M.size.y * s;
+    if (v.police) {
+      g.userData.sirenR = new THREE.Mesh(this.geo.box, this.mat.sirenRed);
+      g.userData.sirenB = new THREE.Mesh(this.geo.box, this.mat.sirenBlue);
+      for (const [m, z] of [[g.userData.sirenR, -W * 0.18], [g.userData.sirenB, W * 0.18]]) {
+        m.scale.set(4, 2.5, W * 0.28);
+        m.position.set(-L * 0.05, topY + 1.2, z);
+        g.add(m);
+      }
+    }
+    const contact = new THREE.Mesh(this.geo.plane, this.mat.contact);
+    contact.scale.set(L * 1.25, 1, W * 1.45);
+    contact.position.y = 0.6;
+    g.add(contact);
+
+    g.userData.paint = paintInfo ? { color: paintInfo.paint.value } : { color: new THREE.Color() };
+    g.userData.dim = paintInfo?.dim || null;
+    g.userData.wheels = wheels;
+    g.userData.wheelRadius = Math.max(0.5, 0.3 * s);
+    g.userData.odo = 0;
+    g.userData.kind = v.kind;
+    g.userData.tex = v.texModel || '';
+    this.scene.add(g);
+    return g;
   }
 
   // ---------- chão, ilha e mar ----------
@@ -199,7 +470,8 @@ export class Renderer3D {
     this.scene.add(sea);
 
     const asphaltMat = this.mat.asphalt;
-    asphaltMat.map.repeat.set(W / 256, H / 256);
+    asphaltMat.map.repeat.set(W / 220, H / 220);
+    asphaltMat.normalMap?.repeat.set(W / 220, H / 220);
     const ground = new THREE.Mesh(new THREE.PlaneGeometry(W, H), asphaltMat);
     ground.rotation.x = -Math.PI / 2;
     ground.position.set(W / 2, 0, H / 2);
@@ -224,8 +496,11 @@ export class Renderer3D {
 
     const sideMat = this.mat.sidewalk.clone();
     sideMat.map = this.mat.sidewalk.map.clone();
-    sideMat.map.needsUpdate = true;
-    sideMat.map.repeat.set(b.w / 128, b.h / 128);
+    sideMat.map.repeat.set(b.w / 90, b.h / 90);
+    if (this.mat.sidewalk.normalMap) {
+      sideMat.normalMap = this.mat.sidewalk.normalMap.clone();
+      sideMat.normalMap.repeat.copy(sideMat.map.repeat);
+    }
     const side = new THREE.Mesh(this.geo.box, sideMat);
     side.scale.set(b.w, 3, b.h);
     side.position.set(b.x + b.w / 2, 1.5, b.y + b.h / 2);
@@ -236,8 +511,11 @@ export class Renderer3D {
       const pb = block.plaza.bounds;
       const gm = this.mat.grass.clone();
       gm.map = this.mat.grass.map.clone();
-      gm.map.needsUpdate = true;
-      gm.map.repeat.set(pb.w / 128, pb.h / 128);
+      gm.map.repeat.set(pb.w / 110, pb.h / 110);
+      if (this.mat.grass.normalMap) {
+        gm.normalMap = this.mat.grass.normalMap.clone();
+        gm.normalMap.repeat.copy(gm.map.repeat);
+      }
       const grass = new THREE.Mesh(this.geo.box, gm);
       grass.scale.set(pb.w, 1, pb.h);
       grass.position.set(pb.x + pb.w / 2, 3.5, pb.y + pb.h / 2);
@@ -297,21 +575,34 @@ export class Renderer3D {
     const bb = bd.bounds;
     const H = buildingHeight({ x: bb.x, y: bb.y, type: bd.type, isHospital: bd.type === 'hospital' });
     const roofCol = toColor(bd.roofColor, '#8d5b4c');
-    const wallCol = roofCol.clone().lerp(new THREE.Color(0.86, 0.82, 0.75), 0.6);
+    const isHouse = bd.type === 'house';
+    const photo = this.photo;
+    const facade = photo ? (isHouse ? this.wallTexHouse : this.wallTexShop) : this.wallTex;
+    // com foto: tinta clara levemente puxada para a cor do telhado (casas mantêm o tijolo)
+    const wallCol = photo
+      ? new THREE.Color(1, 1, 1).lerp(roofCol, isHouse ? 0.1 : 0.32)
+      : roofCol.clone().lerp(new THREE.Color(0.86, 0.82, 0.75), 0.6);
 
     const wallMat = (len) => {
-      const map = this.wallTex.clone();
-      map.needsUpdate = true;
+      const map = facade.clone();
       map.repeat.set(Math.max(1, Math.round(len / 30)), Math.max(1, Math.round(H / 26)));
       const em = this.wallLitTex.clone();
-      em.needsUpdate = true;
       em.repeat.copy(map.repeat);
-      return new THREE.MeshLambertMaterial({ color: wallCol, map, emissive: 0xffffff, emissiveMap: em, emissiveIntensity: 0 });
+      const mat = new THREE.MeshStandardMaterial({ color: wallCol, map, roughness: 0.85, metalness: 0.02, emissive: 0xffffff, emissiveMap: em, emissiveIntensity: 0 });
+      if (photo) {
+        mat.normalMap = (isHouse ? photo.brick_wall_02.nor : photo.painted_plaster_wall.nor).clone();
+        mat.normalMap.repeat.set(len / 60, H / 52);
+        mat.normalScale = new THREE.Vector2(0.7, 0.7);
+      }
+      return mat;
     };
-    const roofMap = this.roofTex.clone();
-    roofMap.needsUpdate = true;
-    roofMap.repeat.set(bb.w / 64, bb.h / 64);
-    const roofMat = new THREE.MeshLambertMaterial({ color: roofCol, map: roofMap });
+    const roofMap = (photo ? photo.concrete_floor_02.diff : this.roofTex).clone();
+    roofMap.repeat.set(bb.w / 80, bb.h / 80);
+    const roofMat = new THREE.MeshStandardMaterial({ color: photo ? new THREE.Color(1, 1, 1).lerp(roofCol, 0.55) : roofCol, map: roofMap, roughness: 0.92 });
+    if (photo) {
+      roofMat.normalMap = photo.concrete_floor_02.nor.clone();
+      roofMat.normalMap.repeat.copy(roofMap.repeat);
+    }
     const wx = wallMat(bb.h);
     const wz = wallMat(bb.w);
     // ordem das faces do BoxGeometry: +x, -x, +y(topo), -y, +z, -z
@@ -454,10 +745,12 @@ export class Renderer3D {
 
   // ---------- veículos ----------
   #buildVehicle(v) {
+    const modelKey = this.carModels ? this.#carModelKey(v) : null;
+    if (modelKey && this.carModels[modelKey]) return this.#buildVehicleModel(v, modelKey);
     const g = new THREE.Group();
     const L = v.length || 60;
     const W = v.width || 28;
-    const paint = new THREE.MeshStandardMaterial({ color: toColor(v.police ? '#f4f4f4' : v.color), metalness: 0.35, roughness: 0.35 });
+    const paint = new THREE.MeshPhysicalMaterial({ color: toColor(v.police ? '#f4f4f4' : v.color), metalness: 0.45, roughness: 0.32, clearcoat: 1, clearcoatRoughness: 0.08 });
     const dark = new THREE.MeshStandardMaterial({ color: 0x15171b, metalness: 0.4, roughness: 0.5 });
     const add = (geo, mat, sx, sy, sz, x, y, z, shadow = true) => {
       const m = new THREE.Mesh(geo, mat);
@@ -541,6 +834,11 @@ export class Renderer3D {
         g.userData.sirenB = add(this.geo.box, this.mat.sirenBlue, 4, 3, W * 0.3, (c0 + c1) / 2, top + P.cabH + 2.4, W * 0.18, false);
       }
     }
+    const contact = new THREE.Mesh(this.geo.plane, this.mat.contact);
+    contact.scale.set(L * 1.25, 1, W * 1.45);
+    contact.position.y = 0.6;
+    contact.renderOrder = -1;
+    g.add(contact);
     g.userData.paint = paint;
     g.userData.kind = v.kind;
     g.userData.tex = tex;
@@ -658,15 +956,26 @@ export class Renderer3D {
     // --- dia e noite ---
     const sky = this.dayCycle.sample(time);
     const dark = sky.darkness;
-    const dayColor = new THREE.Color(0x9cc8ef).lerp(new THREE.Color(0xf0a66a), sky.golden * 0.5);
-    const skyColor = dayColor.lerp(new THREE.Color(0x0a1028), Math.min(1, dark * 1.1));
-    this.scene.background = skyColor;
-    this.scene.fog.color.copy(skyColor);
-    this.hemi.intensity = 1.25 - dark * 0.95;
-    this.sun.intensity = 2.3 * (1 - dark) + 0.05;
-    this.sun.color.set(sky.golden > 0.2 ? 0xffc38a : 0xfff1d6);
-    this.sun.position.set(focus.x - 420, 820, focus.y - 520);
+    const hour = sky.hour ?? 12;
+    // sol nasce às 6h a leste e se põe às 18h a oeste
+    const dayT = (hour - 6) / 12;
+    const elev = Math.sin(dayT * Math.PI) * 0.95;
+    const az = Math.PI * (0.15 + dayT * 0.7);
+    this.sunDir.set(Math.cos(az) * Math.cos(Math.asin(Math.max(-1, Math.min(1, elev)))), elev, -0.45).normalize();
+    this.sky.material.uniforms.sunPosition.value.copy(this.sunDir);
+    this.sky.position.copy(this.camera.position);
+    const horizon = new THREE.Color(0xc9ddef).lerp(new THREE.Color(0xf2a46b), sky.golden * 0.6).lerp(new THREE.Color(0x0b1226), Math.min(1, dark * 1.1));
+    this.scene.fog.color.copy(horizon);
+    this.scene.background = horizon;
+    this.scene.environmentIntensity = 0.38 - dark * 0.3;
+    this.hemi.intensity = 0.62 - dark * 0.45;
+    this.sun.intensity = 2.4 * (1 - dark) + 0.08;
+    this.sun.color.set(sky.golden > 0.2 ? 0xffc08a : 0xfff4e0);
+    const lightDir = elev > 0.08 ? this.sunDir : new THREE.Vector3(-0.3, 0.9, -0.3); // à noite: luar de cima
+    this.sun.position.set(focus.x + lightDir.x * 900, Math.max(260, lightDir.y * 900), focus.y + lightDir.z * 900);
     this.sun.target.position.set(focus.x, 0, focus.y);
+    this.bloom.strength = 0.08 + dark * 0.85;
+    this.bloom.threshold = dark > 0.3 ? 0.6 : 0.97;
     this.mat.lampBulb.color.set(dark > 0.3 ? 0xffe7a8 : 0xd8d8d0);
     const insideCode = player.insideLocationCode;
     for (const entry of this.blockGroups.values()) {
@@ -712,6 +1021,13 @@ export class Renderer3D {
       const paint = mesh.userData.paint;
       if (v.destroyed) paint.color.set(0x2a2a2a);
       else if (!v.police) paint.color.copy(toColor(v.color));
+      if (mesh.userData.dim) mesh.userData.dim.value = v.destroyed ? 0.25 : 1;
+      // rodas girando conforme a distância percorrida
+      if (mesh.userData.wheels?.length) {
+        mesh.userData.odo += (v.speed || 0) * dt;
+        const rot = mesh.userData.odo / mesh.userData.wheelRadius;
+        for (const w of mesh.userData.wheels) w.rotation.x = -rot;
+      }
       if (mesh.userData.sirenR) {
         const on = Math.floor(time * 6) % 2 === 0;
         mesh.userData.sirenR.visible = on;
@@ -875,7 +1191,7 @@ export class Renderer3D {
 
     // --- câmera ---
     this.#updateCamera(player, playerVehicle, dt);
-    this.renderer.render(this.scene, this.camera);
+    this.composer.render();
   }
 
   #updateCamera(player, vehicle, dt) {
@@ -912,6 +1228,8 @@ export class Renderer3D {
     this.lastW = w;
     this.lastH = h;
     this.renderer.setSize(w, h, false);
+    this.composer.setSize(w, h);
+    this.composer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
   }

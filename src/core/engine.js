@@ -892,9 +892,11 @@ export class Engine {
     this.renderer.view3d = this.viewMode === '25d';
     const want3d = this.viewMode === '3d';
     if (want3d && !this.renderer3d && !this.loading3d) {
-      this.loading3d = import('../render/three-renderer.js?v=4')
-        .then(({ Renderer3D }) => {
-          this.renderer3d = new Renderer3D(this.canvasEl || this.renderer.canvas, this.renderer.dayCycle);
+      this.loading3d = import('../render/three-renderer.js?v=11')
+        .then(async ({ Renderer3D }) => {
+          const r3 = new Renderer3D(this.canvasEl || this.renderer.canvas, this.renderer.dayCycle);
+          await r3.ready;
+          this.renderer3d = r3;
           this.renderer3d.setActive(this.viewMode === '3d');
         })
         .catch((err) => {
