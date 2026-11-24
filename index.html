@@ -22,7 +22,7 @@
   <link rel="shortcut icon" href="./story/vibe-coding/favicon.svg">
   <link rel="apple-touch-icon" sizes="180x180" href="./icon-180.png">
   <title>Missão Vibe Coding — Curso em Vídeo</title>
-  <link rel="stylesheet" href="./styles/main.css?v=49">
+  <link rel="stylesheet" href="./styles/main.css?v=50">
 </head>
 <body>
   <div id="game-shell">
@@ -75,6 +75,13 @@
               <rect x="9" y="14" width="6" height="4" rx="1"></rect>
             </svg>
             <span id="inventory-badge" class="hud-action-badge">0/5</span>
+          </button>
+          <button id="camera-button" type="button" class="hud-pill pause-button hud-action-btn" aria-label="Trocar câmera (tecla V)" title="Câmera (V)">
+            <svg class="hud-action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M4 8.5A1.5 1.5 0 0 1 5.5 7h2l1.5-2h6l1.5 2h2A1.5 1.5 0 0 1 20 8.5v9A1.5 1.5 0 0 1 18.5 19h-13A1.5 1.5 0 0 1 4 17.5Z"></path>
+              <circle cx="12" cy="13" r="3.5"></circle>
+            </svg>
+            <span id="camera-badge" class="hud-action-badge">2.5D</span>
           </button>
         </div>
         <div id="hud-bg-progress" class="hud-pill hud-bg-progress hidden" aria-hidden="true">
@@ -308,6 +315,14 @@
           </div>
           <p class="difficulty-desc"></p>
         </div>
+        <div class="difficulty-picker view-picker" data-view-picker>
+          <span class="difficulty-label">Câmera (tecla V)</span>
+          <div class="difficulty-options" role="radiogroup" aria-label="Câmera">
+            <button type="button" data-view="2d">2D</button>
+            <button type="button" data-view="25d">2.5D</button>
+            <button type="button" data-view="3d">3D</button>
+          </div>
+        </div>
         <div class="pause-actions">
           <button id="pause-resume-btn" type="button" class="primary-button">CONTINUAR</button>
           <button id="pause-restart-btn" type="button" class="secondary-button">REINICIAR MISSÃO</button>
@@ -460,6 +475,6 @@
       });
     })();
   </script>
-  <script type="module" src="./src/main.js?v=105"></script>
+  <script type="module" src="./src/main.js?v=106"></script>
 </body>
 </html>

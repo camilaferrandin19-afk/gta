@@ -76,6 +76,14 @@ export class Engine {
     } catch { /* sem storage */ }
     this.renderer3d = null;
     this.#applyViewMode(false);
+    // botão de câmera no HUD e escolha no menu de pausa
+    this.onCameraButton = () => this.setViewMode({ '2d': '25d', '25d': '3d', '3d': '2d' }[this.viewMode] || '25d');
+    document.getElementById('camera-button')?.addEventListener('click', this.onCameraButton);
+    this.onViewPicker = (ev) => {
+      const btn = ev.target.closest('[data-view]');
+      if (btn) this.setViewMode(btn.dataset.view);
+    };
+    document.querySelector('[data-view-picker]')?.addEventListener('click', this.onViewPicker);
     this.minimap = new Minimap(minimapCanvas);
     this.input = new InputManager(touchControlsEl);
 
@@ -220,10 +228,7 @@ export class Engine {
           startReload(this.weapons.arsenal);
         } else if (e.code === 'KeyV' && !e.repeat) {
           // Troca a visão: 2D → 2.5D → 3D completo → 2D
-          const next = { '2d': '25d', '25d': '3d', '3d': '2d' };
-          this.viewMode = next[this.viewMode] || '25d';
-          try { localStorage.setItem('gta-visao', this.viewMode); } catch { /* sem storage */ }
-          this.#applyViewMode(true);
+          this.onCameraButton();
         }
       }
       if (e.key === 'i' || e.key === 'I' || e.key === 'Tab') {
@@ -294,6 +299,8 @@ export class Engine {
     this.running = false;
     if (this.#onKeyDown) window.removeEventListener('keydown', this.#onKeyDown);
     if (this.onDifficultyEvent) window.removeEventListener('gta-difficulty', this.onDifficultyEvent);
+    document.getElementById('camera-button')?.removeEventListener('click', this.onCameraButton);
+    document.querySelector('[data-view-picker]')?.removeEventListener('click', this.onViewPicker);
     if (this.#onResize) window.removeEventListener('resize', this.#onResize);
     if (this.#onPageHide) window.removeEventListener('pagehide', this.#onPageHide);
     if (this.#onVisibilityChange) document.removeEventListener('visibilitychange', this.#onVisibilityChange);
@@ -867,7 +874,21 @@ export class Engine {
     this.routePoints = this.pathfinder.findRoute(this.player.x, this.player.y, this.objectiveCode);
   }
 
+  /** Muda a câmera: '2d', '25d' ou '3d'. */
+  setViewMode(mode) {
+    if (!['2d', '25d', '3d'].includes(mode)) return;
+    this.viewMode = mode;
+    try { localStorage.setItem('gta-visao', mode); } catch { /* sem storage */ }
+    this.#applyViewMode(true);
+  }
+
   #applyViewMode(announce) {
+    const label = { '2d': '2D', '25d': '2.5D', '3d': '3D' }[this.viewMode];
+    const badge = document.getElementById('camera-badge');
+    if (badge) badge.textContent = label;
+    for (const b of document.querySelectorAll('[data-view-picker] [data-view]')) {
+      b.classList.toggle('active', b.dataset.view === this.viewMode);
+    }
     this.renderer.view3d = this.viewMode === '25d';
     const want3d = this.viewMode === '3d';
     if (want3d && !this.renderer3d && !this.loading3d) {
