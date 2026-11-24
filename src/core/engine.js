@@ -1,6 +1,6 @@
 import { CityMap } from '../world/city-map.js?v=30';
 import { RoadPathfinder } from '../world/pathfinding.js';
-import { TrafficManager } from '../world/traffic-manager.js?v=24';
+import { TrafficManager } from '../world/traffic-manager.js?v=25';
 import { BoatManager } from '../world/boat-manager.js?v=17';
 import { InputManager } from '../input/input-manager.js?v=21';
 import { WebGLRenderer } from '../render/webgl-renderer.js?v=51';
@@ -917,7 +917,7 @@ export class Engine {
     this.renderer.view3d = this.viewMode === '25d';
     const want3d = this.viewMode === '3d';
     if (want3d && !this.renderer3d && !this.loading3d) {
-      this.loading3d = import('../render/three-renderer.js?v=18')
+      this.loading3d = import('../render/three-renderer.js?v=23')
         .then(async ({ Renderer3D }) => {
           const r3 = new Renderer3D(this.canvasEl || this.renderer.canvas, this.renderer.dayCycle);
           await r3.ready;

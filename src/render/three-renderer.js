@@ -134,6 +134,7 @@ export class Renderer3D {
     this.vehicleMeshes = new Map();
     this.pedMeshes = new Map();
     this.pedPool = {};
+    this.motion = new Map(); // id → { x, y, v, ang } (velocidade e direção reais, suavizadas)
     this.tmpColorA = new THREE.Color();
     this.tmpColorB = new THREE.Color();
     this.moonDir = new THREE.Vector3(-0.3, 0.9, -0.3);
@@ -497,6 +498,30 @@ export class Renderer3D {
     return root;
   }
 
+  // Velocidade e direção de verdade (pela posição), para a animação não "andar parada" nem deslizar de lado
+  #trackMotion(id, x, y, fallbackAngle, dt) {
+    let st = this.motion.get(id);
+    if (!st || Math.hypot(x - st.x, y - st.y) > 200) {
+      st = { x, y, v: 0, ang: fallbackAngle || 0, seen: 0 };
+      this.motion.set(id, st);
+    }
+    const dx = x - st.x;
+    const dy = y - st.y;
+    const step = Math.hypot(dx, dy);
+    const inst = step / Math.max(dt, 1e-3);
+    st.v += (inst - st.v) * Math.min(1, dt * 8);
+    if (step > 0.15) {
+      const target = Math.atan2(dy, dx);
+      let diff = target - st.ang;
+      diff = Math.atan2(Math.sin(diff), Math.cos(diff));
+      st.ang += diff * Math.min(1, dt * 10);
+    }
+    st.x = x;
+    st.y = y;
+    st.seen = this.frameId;
+    return st;
+  }
+
   #recolor(fig, recolor) {
     for (const m of fig.userData.mats || []) {
       const c = recolor[m.name];
@@ -579,40 +604,64 @@ export class Renderer3D {
   }
 
   // Material do carro: igual ao do modelo, mas a cor da carroceria vira a cor do veículo no jogo
-  #carPaintMaterial(base, bodyKey, color) {
+  #carPaintMaterial(base, bodyKey, color, zRange = null) {
     const m = base.clone();
     m.roughness = 0.42;
     m.metalness = 0.25;
     m.envMapIntensity = 1.2;
     const paint = { value: toColor(color) };
     const dim = { value: 1 };
-    if (bodyKey) {
+    const lights = { value: 0 };
+    const brake = { value: 0 };
+    const recolor = { value: bodyKey ? 1 : 0 };
+    {
       m.onBeforeCompile = (sh) => {
         sh.uniforms.uPaint = paint;
-        sh.uniforms.uKey = { value: bodyKey };
+        sh.uniforms.uKey = { value: bodyKey || new THREE.Color(-10, -10, -10) };
         sh.uniforms.uDim = dim;
-        sh.fragmentShader = 'uniform vec3 uPaint;\nuniform vec3 uKey;\nuniform float uDim;\n' + sh.fragmentShader.replace(
+        sh.uniforms.uLights = lights;
+        sh.uniforms.uBrake = brake;
+        sh.uniforms.uRecolor = recolor;
+        // posição ao longo do carro (frente = +Z no modelo): faróis só na frente, lanternas só atrás
+        sh.uniforms.uZ = { value: new THREE.Vector2(zRange ? zRange[0] : -1, zRange ? zRange[1] : 1) };
+        sh.vertexShader = 'varying float vCarZ;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n  vCarZ = position.z;');
+        // vidro (azul-claro da paleta) vira vidro escuro espelhado; faróis brancos e lanternas vermelhas acendem
+        sh.fragmentShader = sh.fragmentShader
+          .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n  roughnessFactor = gGlass > 0.5 ? 0.05 : (gPaint > 0.5 ? 0.24 : 0.8);')
+          .replace('#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>\n  metalnessFactor = gGlass > 0.5 ? 0.9 : (gPaint > 0.5 ? 0.4 : 0.05);')
+          .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n  totalEmissiveRadiance += gHead * uLights * vec3(2.6, 2.4, 2.0) + gTail * (uLights * 0.9 + uBrake * 2.6) * vec3(2.6, 0.25, 0.15);');
+        sh.fragmentShader = 'uniform vec3 uPaint;\nuniform vec3 uKey;\nuniform float uDim;\nuniform float uLights;\nuniform float uBrake;\nuniform float uRecolor;\nuniform vec2 uZ;\nvarying float vCarZ;\n' + sh.fragmentShader.replace(
           '#include <map_fragment>',
           [
             '#include <map_fragment>',
+            'float gPaint = 0.0; float gGlass = 0.0; float gHead = 0.0; float gTail = 0.0;',
             '{',
             '  vec3 c = diffuseColor.rgb;',
             '  float mx = max(c.r, max(c.g, c.b));',
             '  float mn = min(c.r, min(c.g, c.b));',
             '  float sat = (mx - mn) / max(mx, 1e-4);',
             // mesmo matiz da carroceria (tons claros e escuros dela) vira a cor do veículo
-            '  if (sat > 0.35 && distance(normalize(c + 1e-4), normalize(uKey + 1e-4)) < 0.16) {',
+            '  float zr = (vCarZ - uZ.x) / max(uZ.y - uZ.x, 1e-4);',
+            // lanterna traseira: vermelho bem puro na traseira (antes da repintura, que pegaria o vermelho)
+            '  if (c.r > 0.25 && c.g < 0.07 && c.b < 0.07 && zr < 0.12) { gTail = 1.0; }',
+            '  else if (sat > 0.35 && distance(normalize(c + 1e-4), normalize(uKey + 1e-4)) < 0.16) {',
             '    float lum = dot(c, vec3(0.2126, 0.7152, 0.0722)) / max(dot(uKey, vec3(0.2126, 0.7152, 0.0722)), 1e-4);',
-            '    diffuseColor.rgb = uPaint * clamp(lum, 0.35, 1.6);',
+            '    if (uRecolor > 0.5) diffuseColor.rgb = uPaint * clamp(lum, 0.35, 1.6);',
+            '    gPaint = 1.0;',
+            '  } else {',
+            '    float l = dot(c, vec3(0.2126, 0.7152, 0.0722));',
+            '    if (c.b > c.r * 1.08 && c.b >= c.g && l > 0.3 && sat < 0.45) { gGlass = 1.0; diffuseColor.rgb = vec3(0.035, 0.05, 0.075); }',
+            '    if (mn > 0.72 && zr > 0.88) gHead = 1.0;',
+            '    else if (c.r > 0.35 && c.g < 0.2 && c.b < 0.2 && zr < 0.1) gTail = 1.0;',
             '  }',
             '}',
             'diffuseColor.rgb *= uDim;',
           ].join('\n'),
         );
       };
-      m.customProgramCacheKey = () => 'car-paint';
+      m.customProgramCacheKey = () => 'car-paint-4';
     }
-    return { material: m, paint, dim };
+    return { material: m, paint, dim, lights, brake };
   }
 
   #carModelKey(v) {
@@ -637,11 +686,13 @@ export class Renderer3D {
     inst.scale.setScalar(s);
     inst.position.set(-M.center.x * s, -M.box.min.y * s, -M.center.z * s);
     pivot.add(inst);
+    const tilt = new THREE.Group(); // inclinação da carroceria
+    tilt.add(pivot);
     // os modelos do Kenney apontam a frente para +Z: girar para a frente ficar em +X
     pivot.rotation.y = alongZ ? Math.PI / 2 : 0;
-    g.add(pivot);
+    g.add(tilt);
+    g.userData.tilt = tilt;
 
-    const recolor = key !== 'police';
     let paintInfo = null;
     const wheels = [];
     inst.traverse((o) => {
@@ -649,10 +700,9 @@ export class Renderer3D {
       if (!o.isMesh) return;
       o.castShadow = true;
       o.receiveShadow = true;
-      if (recolor) {
-        if (!paintInfo) paintInfo = this.#carPaintMaterial(o.material, M.bodyKey, v.color);
-        o.material = paintInfo.material;
-      }
+      if (!paintInfo) paintInfo = this.#carPaintMaterial(o.material, key === 'police' ? null : M.bodyKey, v.color, [M.box.min.z, M.box.max.z]);
+      o.material = paintInfo.material;
+      if (/^wheel-front/i.test(o.parent?.name || '') || /^wheel-front/i.test(o.name)) o.userData.front = true;
     });
     const topY = M.size.y * s;
     if (v.police) {
@@ -671,6 +721,9 @@ export class Renderer3D {
 
     g.userData.paint = paintInfo ? { color: paintInfo.paint.value } : { color: new THREE.Color() };
     g.userData.dim = paintInfo?.dim || null;
+    g.userData.lights = paintInfo?.lights || null;
+    g.userData.brake = paintInfo?.brake || null;
+    for (const w of wheels) w.rotation.order = 'YXZ';
     g.userData.wheels = wheels;
     g.userData.wheelRadius = Math.max(0.5, 0.3 * s);
     g.userData.odo = 0;
@@ -1155,12 +1208,13 @@ export class Renderer3D {
       let want = 'Idle';
       if (opts.dead) want = 'Death';
       else if (lift > 0) want = 'Idle';
-      else if (spd > 140) want = 'Run';
-      else if (spd > 6) want = 'Walk';
+      else if (spd > 95) want = 'Run';
+      else if (spd > 8) want = 'Walk';
       else if (opts.armed) want = 'Idle_Gun';
       const a = this.#playAction(fig, want);
-      if (want === 'Walk') a.timeScale = Math.min(1.8, Math.max(0.6, spd / 60));
-      else if (want === 'Run') a.timeScale = Math.min(1.5, Math.max(0.8, spd / 200));
+      // passadas proporcionais à velocidade (evita o pé "patinando")
+      if (want === 'Walk') a.timeScale = Math.min(1.9, Math.max(0.55, spd / 38));
+      else if (want === 'Run') a.timeScale = Math.min(1.6, Math.max(0.8, spd / 130));
       else a.timeScale = 1;
       fig.userData.mixer.update(this.frameDt || 1 / 60);
       return;
@@ -1313,11 +1367,36 @@ export class Renderer3D {
         else if (!v.police) paint.color.copy(toColor(v.color));
       }
       if (mesh.userData.dim) mesh.userData.dim.value = v.destroyed ? 0.25 : 1;
-      // rodas girando conforme a distância percorrida
-      if (mesh.userData.wheels?.length) {
-        mesh.userData.odo += (v.speed || 0) * dt;
-        const rot = mesh.userData.odo / mesh.userData.wheelRadius;
-        for (const w of mesh.userData.wheels) w.rotation.x = -rot;
+      // suspensão, faróis/freio e rodas
+      const u = mesh.userData;
+      const prevAngle = u.prevAngle ?? v.angle;
+      const prevSpeed = u.prevSpeed ?? (v.speed || 0);
+      let dAng = v.angle - prevAngle;
+      dAng = Math.atan2(Math.sin(dAng), Math.cos(dAng));
+      const yawRate = dAng / Math.max(dt, 1e-3);
+      const accel = ((v.speed || 0) - prevSpeed) / Math.max(dt, 1e-3);
+      u.prevAngle = v.angle;
+      u.prevSpeed = v.speed || 0;
+      if (u.tilt) {
+        const k = Math.min(1, dt * 6);
+        const roll = Math.max(-0.09, Math.min(0.09, yawRate * Math.abs(v.speed || 0) * 0.00011));
+        const pitch = Math.max(-0.06, Math.min(0.06, accel * 0.00009));
+        u.tilt.rotation.x += (roll - u.tilt.rotation.x) * k;
+        u.tilt.rotation.z += (pitch - u.tilt.rotation.z) * k;
+      }
+      if (u.lights) u.lights.value = dark > 0.35 ? 1 : 0;
+      if (u.brake) {
+        const braking = accel < -60 && Math.abs(v.speed || 0) > 8;
+        u.brake.value += ((braking ? 1 : 0) - u.brake.value) * Math.min(1, dt * 10);
+      }
+      if (u.wheels?.length) {
+        u.odo += (v.speed || 0) * dt;
+        const rot = u.odo / u.wheelRadius;
+        u.steer = (u.steer || 0) + ((Math.max(-0.5, Math.min(0.5, -yawRate * 0.35))) - (u.steer || 0)) * Math.min(1, dt * 8);
+        for (const w of u.wheels) {
+          w.rotation.x = -rot;
+          w.rotation.y = /front/i.test(w.name) ? u.steer : 0;
+        }
       }
       if (mesh.userData.sirenR) {
         const on = Math.floor(time * 6) % 2 === 0;
@@ -1344,7 +1423,8 @@ export class Renderer3D {
       const fig = this.#pedFigure(ped);
       fig.visible = true;
       const down = (ped.health ?? 1) <= 0;
-      this.#animateFigure(fig, ped.x, ped.y, ped.angle || 0, ped.walkPhase || 0, (ped.speed || 0) > 1, 0, { speed: ped.speed || 0, dead: down });
+      const mv = this.#trackMotion(ped.id, ped.x, ped.y, ped.angle, dt);
+      this.#animateFigure(fig, ped.x, ped.y, mv.ang, ped.walkPhase || 0, mv.v > 6, 0, { speed: mv.v, dead: down });
       if (!fig.userData.mixer) fig.rotation.z = down ? Math.PI / 2 : 0;
     }
     for (const [id, fig] of this.pedMeshes) {
@@ -1355,6 +1435,10 @@ export class Renderer3D {
         (this.pedPool[kind] ||= []).push(fig);
         this.pedMeshes.delete(id);
       }
+    }
+
+    if (this.frameId % 120 === 0) {
+      for (const [id, st] of this.motion) if (this.frameId - st.seen > 120) this.motion.delete(id);
     }
 
     // --- protagonista e parceira ---
@@ -1374,7 +1458,7 @@ export class Renderer3D {
       const px = onMoto ? playerVehicle.x : player.x;
       const py = onMoto ? playerVehicle.y : player.y;
       this.#animateFigure(this.playerFig, px, py, onMoto ? playerVehicle.angle : player.angle, player.walkPhase || 0, !onMoto && (player.speed || 0) > 5, onMoto ? 6 : 0, {
-        speed: onMoto ? 0 : Math.abs(player.speed || 0),
+        speed: onMoto ? 0 : this.#trackMotion('__player', px, py, player.angle, dt).v,
         armed: Boolean(player.weaponId && player.weaponId !== 'punhos'),
       });
     }
@@ -1396,7 +1480,7 @@ export class Renderer3D {
         const bx = rv ? rv.x - Math.cos(rv.angle) * 10 : partner.x;
         const by = rv ? rv.y - Math.sin(rv.angle) * 10 : partner.y;
         this.#animateFigure(this.partnerFig, bx, by, rv ? rv.angle : partner.angle || 0, partner.walkPhase || 0, !rv && (partner.speed || 0) > 5, rv ? 6 : 0, {
-          speed: rv ? 0 : Math.abs(partner.speed || 0),
+          speed: rv ? 0 : this.#trackMotion('__partner', bx, by, partner.angle, dt).v,
         });
       }
     } else if (this.partnerFig) {

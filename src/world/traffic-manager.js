@@ -140,7 +140,7 @@ export class TrafficManager {
       dirY: dir.y,
       angle: Math.atan2(dir.y, dir.x),
       speed: 62,
-      baseSpeed: 62,
+      baseSpeed: 46, // passo de caminhada (antes 62, parecia trote)
       health: 100,
       radius: 10,
       hitCooldown: 0,
@@ -212,7 +212,7 @@ export class TrafficManager {
       dirY,
       angle: Math.atan2(dirY, dirX),
       speed: 118,
-      baseSpeed: 62,
+      baseSpeed: 46,
       health: 100,
       radius: 10,
       hitCooldown: 0,
@@ -413,7 +413,7 @@ export class TrafficManager {
         }
       }
 
-      const targetSpeed = ped.state === 'fleeing' ? 158 : (ped.baseSpeed || 62);
+      const targetSpeed = ped.state === 'fleeing' ? 158 : (ped.baseSpeed || 46);
       ped.speed += (targetSpeed - ped.speed) * Math.min(1, dt * (ped.state === 'fleeing' ? 7 : 4));
 
       const nextX = ped.x + ped.dirX * ped.speed * dt;
