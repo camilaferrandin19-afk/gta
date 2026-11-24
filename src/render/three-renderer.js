@@ -8,6 +8,7 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { Sky } from 'three/addons/objects/Sky.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 import { blockDecor, buildingHeight } from './webgl-renderer.js?v=51';
 
 const BLOCK_RADIUS = 1500; // distância (em unidades do mundo) em que a cidade é montada
@@ -113,6 +114,7 @@ export class Renderer3D {
     this.ready = Promise.all([
       this.#loadPhotoTextures().catch((err) => console.warn('[3D] Texturas fotográficas indisponíveis:', err)),
       this.#loadCarModels().catch((err) => console.warn('[3D] Modelos de carro indisponíveis:', err)),
+      this.#loadPeople().catch((err) => console.warn('[3D] Personagens 3D indisponíveis:', err)),
     ]);
     this.blockGroups = new Map();
     this.vehicleMeshes = new Map();
@@ -355,6 +357,84 @@ export class Renderer3D {
       models[key] = { root, box, size: box.getSize(new THREE.Vector3()), center: box.getCenter(new THREE.Vector3()), bodyKey };
     }));
     this.carModels = models;
+  }
+
+  // Pessoas animadas (Quaternius, CC0)
+  async #loadPeople() {
+    const loader = new GLTFLoader();
+    const people = {};
+    await Promise.all(['woman1', 'woman2', 'man', 'hoodie', 'punk'].map(async (name) => {
+      const gltf = await loader.loadAsync(`./assets3d/people/${name}.glb`);
+      const box = new THREE.Box3().setFromObject(gltf.scene);
+      const clips = {};
+      for (const clip of gltf.animations) {
+        const short = clip.name.split('|').pop().replace(/^Man_/, '');
+        clips[short] = clip;
+      }
+      people[name] = { scene: gltf.scene, clips, height: box.max.y - box.min.y, minY: box.min.y };
+    }));
+    this.people = people;
+  }
+
+  // Cria uma pessoa animada; recolor = { nomeDoMaterial: cor }
+  #makeCharacter(name, recolor = {}, height = 34) {
+    const M = this.people[name];
+    const root = new THREE.Group();
+    const inst = cloneSkinned(M.scene);
+    const s = height / M.height;
+    inst.scale.setScalar(s);
+    inst.position.y = -M.minY * s;
+    // os modelos olham para +Z; a frente do jogo é +X
+    const pivot = new THREE.Group();
+    pivot.rotation.y = Math.PI / 2;
+    pivot.add(inst);
+    root.add(pivot);
+    const matCache = new Map();
+    inst.traverse((o) => {
+      if (!o.isMesh) return;
+      o.castShadow = true;
+      o.receiveShadow = true;
+      o.frustumCulled = false;
+      const swap = (m) => {
+        if (!matCache.has(m)) {
+          const c = m.clone();
+          if (recolor[m.name] !== undefined && recolor[m.name] !== null) c.color.copy(toColor(recolor[m.name]));
+          c.roughness = 0.75;
+          c.metalness = 0;
+          matCache.set(m, c);
+        }
+        return matCache.get(m);
+      };
+      o.material = Array.isArray(o.material) ? o.material.map(swap) : swap(o.material);
+    });
+    const mixer = new THREE.AnimationMixer(inst);
+    const actions = {};
+    for (const [k, clip] of Object.entries(M.clips)) actions[k] = mixer.clipAction(clip);
+    root.userData = { mixer, actions, current: null, model: name };
+    this.scene.add(root);
+    return root;
+  }
+
+  #playAction(fig, name) {
+    const u = fig.userData;
+    const next = u.actions[name] ? name : (u.actions.Idle ? 'Idle' : Object.keys(u.actions)[0]);
+    if (u.current === next) return u.actions[next];
+    const a = u.actions[next];
+    a.reset();
+    if (next === 'Death') {
+      a.setLoop(THREE.LoopOnce, 1);
+      a.clampWhenFinished = true;
+    }
+    a.fadeIn(0.2).play();
+    if (u.current) u.actions[u.current].fadeOut(0.2);
+    u.current = next;
+    return a;
+  }
+
+  // Pessoa: modelo animado quando disponível, senão o boneco de blocos
+  #character(kind, colors) {
+    if (!this.people) return this.#buildFigure(colors.blocky);
+    return this.#makeCharacter(kind, colors.recolor, colors.height || 34);
   }
 
   // Material do carro: igual ao do modelo, mas a cor da carroceria vira a cor do veículo no jogo
@@ -899,10 +979,25 @@ export class Renderer3D {
     return g;
   }
 
-  #animateFigure(fig, x, y, angle, walkPhase, moving, lift = 0) {
+  #animateFigure(fig, x, y, angle, walkPhase, moving, lift = 0, opts = {}) {
     fig.position.set(x, 3 + lift, y);
-    fig.scale.setScalar(1.2);
     fig.rotation.y = -angle;
+    if (fig.userData.mixer) {
+      const spd = opts.speed ?? (moving ? 50 : 0);
+      let want = 'Idle';
+      if (opts.dead) want = 'Death';
+      else if (lift > 0) want = 'Idle';
+      else if (spd > 140) want = 'Run';
+      else if (spd > 6) want = 'Walk';
+      else if (opts.armed) want = 'Idle_Gun';
+      const a = this.#playAction(fig, want);
+      if (want === 'Walk') a.timeScale = Math.min(1.8, Math.max(0.6, spd / 60));
+      else if (want === 'Run') a.timeScale = Math.min(1.5, Math.max(0.8, spd / 200));
+      else a.timeScale = 1;
+      fig.userData.mixer.update(this.frameDt || 1 / 60);
+      return;
+    }
+    fig.scale.setScalar(1.2);
     const s = moving ? Math.sin(walkPhase * 0.18) * 0.6 : 0;
     const u = fig.userData;
     u.legL.rotation.z = s;
@@ -914,12 +1009,20 @@ export class Renderer3D {
   #pedFigure(ped) {
     let fig = this.pedMeshes.get(ped.id);
     if (!fig) {
-      fig = this.#buildFigure({
+      const blocky = {
         shirt: ped.color,
         pants: ped.pantsColor || '#2d3748',
         skin: ped.skinColor || '#e0b48c',
         hair: ped.hairColor || '#2b1d14',
-      });
+      };
+      const models = ['man', 'hoodie', 'punk', 'woman1', 'woman2', 'man'];
+      const id = String(ped.id);
+      let h = 0;
+      for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
+      const kind = models[h % models.length];
+      const shirtMat = { man: 'Shirt', hoodie: 'Purple', punk: 'Red', woman1: 'White', woman2: 'Red' }[kind];
+      const recolor = { [shirtMat]: ped.color, Skin: ped.skinColor || null, Pants: ped.pantsColor || null, Hair: ped.hairColor || null };
+      fig = this.#character(kind, { blocky, recolor, height: 31 + (h % 5) });
       this.pedMeshes.set(ped.id, fig);
     }
     fig.userData.seen = this.frameId;
@@ -929,6 +1032,7 @@ export class Renderer3D {
   // ---------- quadro ----------
   render(p) {
     const { cityMap, player, vehicles, pedestrians, partner, time, dt = 1 / 60 } = p;
+    this.frameDt = dt;
     this.frameId = (this.frameId || 0) + 1;
     if (!this.groundBuilt) {
       this.#buildGround(cityMap);
@@ -1048,8 +1152,8 @@ export class Renderer3D {
       const fig = this.#pedFigure(ped);
       fig.visible = true;
       const down = (ped.health ?? 1) <= 0;
-      this.#animateFigure(fig, ped.x, ped.y, ped.angle || 0, ped.walkPhase || 0, (ped.speed || 0) > 1);
-      fig.rotation.z = down ? Math.PI / 2 : 0;
+      this.#animateFigure(fig, ped.x, ped.y, ped.angle || 0, ped.walkPhase || 0, (ped.speed || 0) > 1, 0, { speed: ped.speed || 0, dead: down });
+      if (!fig.userData.mixer) fig.rotation.z = down ? Math.PI / 2 : 0;
     }
     for (const [id, fig] of this.pedMeshes) {
       if (fig.userData.seen !== this.frameId) {
@@ -1061,19 +1165,32 @@ export class Renderer3D {
     // --- protagonista e parceira ---
     if (!this.playerFig) {
       const c = p.protagonistColors || {};
-      this.playerFig = this.#buildFigure({ shirt: c.shirt || '#1e1e23', sleeve: c.sleeve, pants: c.pants || '#1e1e23', skin: c.skin || '#f3cda6', hair: '#6b3f22', longHair: true, shoes: c.shoes || '#f3f2ee' });
+      this.playerFig = this.#character('woman1', {
+        blocky: { shirt: c.shirt || '#1e1e23', sleeve: c.sleeve, pants: c.pants || '#1e1e23', skin: c.skin || '#f3cda6', hair: '#6b3f22', longHair: true, shoes: c.shoes || '#f3f2ee' },
+        // Ana Laura: camiseta preta, calça escura, tênis claro, cabelo castanho comprido
+        recolor: { White: c.shirt || '#1e1e23', Grey: '#2a2a31', Brown: c.shoes || '#f3f2ee', Orange: c.pants || '#1e1e23', Skin: c.skin || '#f3cda6', Hair_Brown: '#6b3f22', Hair_Blond: '#6b3f22' },
+        height: 34,
+      });
     }
     const onMoto = playerVehicle?.kind === 'moto';
     this.playerFig.visible = (!playerVehicle || onMoto) && !player.isDead;
     if (this.playerFig.visible) {
       const px = onMoto ? playerVehicle.x : player.x;
       const py = onMoto ? playerVehicle.y : player.y;
-      this.#animateFigure(this.playerFig, px, py, onMoto ? playerVehicle.angle : player.angle, player.walkPhase || 0, !onMoto && (player.speed || 0) > 5, onMoto ? 6 : 0);
+      this.#animateFigure(this.playerFig, px, py, onMoto ? playerVehicle.angle : player.angle, player.walkPhase || 0, !onMoto && (player.speed || 0) > 5, onMoto ? 6 : 0, {
+        speed: onMoto ? 0 : Math.abs(player.speed || 0),
+        armed: Boolean(player.weaponId && player.weaponId !== 'punhos'),
+      });
     }
     if (partner && partner.visible !== false && partner.state !== 'unplaced') {
       if (!this.partnerFig) {
         const c = p.partnerColors || {};
-        this.partnerFig = this.#buildFigure({ shirt: c.shirt || '#2c6a43', sleeve: c.sleeve, pants: c.pants || '#1e1e23', skin: c.skin || '#f3cda6', hair: '#3a2416', longHair: true, shoes: c.shoes || '#3a3a42' });
+        this.partnerFig = this.#character('woman2', {
+          blocky: { shirt: c.shirt || '#2c6a43', sleeve: c.sleeve, pants: c.pants || '#1e1e23', skin: c.skin || '#f3cda6', hair: '#3a2416', longHair: true, shoes: c.shoes || '#3a3a42' },
+          // Camila: jaqueta verde, calça escura
+          recolor: { Red: '#3a2416', LimeGreen: c.sleeve || '#2c6a43', Skin: c.skin || '#f3cda6' },
+          height: 34,
+        });
       }
       const riding = partner.state === 'riding';
       const rv = riding ? vehicles.find((v) => v.id === partner.vehicleId) : null;
@@ -1081,7 +1198,9 @@ export class Renderer3D {
       if (this.partnerFig.visible) {
         const bx = rv ? rv.x - Math.cos(rv.angle) * 10 : partner.x;
         const by = rv ? rv.y - Math.sin(rv.angle) * 10 : partner.y;
-        this.#animateFigure(this.partnerFig, bx, by, rv ? rv.angle : partner.angle || 0, partner.walkPhase || 0, !rv && (partner.speed || 0) > 5, rv ? 6 : 0);
+        this.#animateFigure(this.partnerFig, bx, by, rv ? rv.angle : partner.angle || 0, partner.walkPhase || 0, !rv && (partner.speed || 0) > 5, rv ? 6 : 0, {
+          speed: rv ? 0 : Math.abs(partner.speed || 0),
+        });
       }
     } else if (this.partnerFig) {
       this.partnerFig.visible = false;
@@ -1095,7 +1214,10 @@ export class Renderer3D {
       const key = `${Math.round(n.x)}:${Math.round(n.y)}`;
       let fig = this.extraFigures.get(key);
       if (!fig) {
-        fig = this.#buildFigure({ shirt: '#c2410c', pants: '#334155', skin: '#e0b48c', hair: '#2b1d14' });
+        fig = this.#character('man', {
+          blocky: { shirt: '#c2410c', pants: '#334155', skin: '#e0b48c', hair: '#2b1d14' },
+          recolor: { Shirt: '#c2410c', Pants: '#334155' },
+        });
         this.extraFigures.set(key, fig);
       }
       npcSeen.add(key);
@@ -1182,7 +1304,7 @@ export class Renderer3D {
     if (playerVehicle && dark > 0.3) {
       const fx = Math.cos(playerVehicle.angle);
       const fy = Math.sin(playerVehicle.angle);
-      this.headlight.intensity = 4000 * dark;
+      this.headlight.intensity = 900 * dark;
       this.headlight.position.set(playerVehicle.x + fx * 30, 16, playerVehicle.y + fy * 30);
       this.headlight.target.position.set(playerVehicle.x + fx * 260, 0, playerVehicle.y + fy * 260);
     } else {
@@ -1207,8 +1329,8 @@ export class Renderer3D {
       look = new THREE.Vector3(vehicle.x + fx * 60, 12, vehicle.y + fy * 60);
     } else {
       // a pé: câmera alta olhando para o "norte", assim W/A/S/D continuam iguais
-      pos = new THREE.Vector3(player.x, 150, player.y + 165);
-      look = new THREE.Vector3(player.x, 12, player.y - 25);
+      pos = new THREE.Vector3(player.x, 112, player.y + 128);
+      look = new THREE.Vector3(player.x, 16, player.y - 22);
     }
     if (!this.camPos) {
       this.camPos = pos.clone();

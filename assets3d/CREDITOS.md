@@ -12,3 +12,9 @@ Todos os recursos abaixo são **CC0 (domínio público)** — uso livre, inclusi
 - Licença original em `cars/LICENSE-Kenney-CarKit.txt`
 
 ## Biblioteca 3D — three.js 0.170.0 (MIT) em `vendor/three`
+
+## Pessoas animadas — Quaternius (https://quaternius.com), via Poly Pizza — CC0
+- `woman1.glb` Animated Woman (https://poly.pizza/m/qJ2gsTUBHL) — Ana Laura
+- `woman2.glb` Animated Woman (https://poly.pizza/m/nIItLV9nxS) — Camila
+- `man.glb` Man (https://poly.pizza/m/HMnuH5geEG), `hoodie.glb` Hoodie Character (https://poly.pizza/m/gKLBoRsyKe),
+  `punk.glb` Punk (https://poly.pizza/m/BTALZymknF) — pedestres

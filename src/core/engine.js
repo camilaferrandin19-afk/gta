@@ -892,7 +892,7 @@ export class Engine {
     this.renderer.view3d = this.viewMode === '25d';
     const want3d = this.viewMode === '3d';
     if (want3d && !this.renderer3d && !this.loading3d) {
-      this.loading3d = import('../render/three-renderer.js?v=11')
+      this.loading3d = import('../render/three-renderer.js?v=15')
         .then(async ({ Renderer3D }) => {
           const r3 = new Renderer3D(this.canvasEl || this.renderer.canvas, this.renderer.dayCycle);
           await r3.ready;
