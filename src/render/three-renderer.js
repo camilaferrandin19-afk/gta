@@ -9,9 +9,24 @@ import { Sky } from 'three/addons/objects/Sky.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { blockDecor, buildingHeight } from './webgl-renderer.js?v=51';
 
-const BLOCK_RADIUS = 1500; // distância (em unidades do mundo) em que a cidade é montada
+// Níveis de gráficos: o jogo cai sozinho para um nível mais leve se ficar lento
+export const QUALITY = {
+  leve: { label: 'Leve', pixelRatio: 0.8, shadows: false, shadowSize: 1024, bloom: false, radius: 950, fogNear: 450, fogFar: 1250, peds: 10, pedShadows: false },
+  medio: { label: 'Médio', pixelRatio: 1, shadows: true, shadowSize: 1024, bloom: true, radius: 1200, fogNear: 650, fogFar: 1650, peds: 18, pedShadows: false },
+  alto: { label: 'Alto', pixelRatio: 2, shadows: true, shadowSize: 2048, bloom: true, radius: 1500, fogNear: 1000, fogFar: 2600, peds: 30, pedShadows: true },
+};
+const QUALITY_ORDER = ['leve', 'medio', 'alto'];
+function loadQualityId() {
+  try {
+    const q = localStorage.getItem('gta-graficos');
+    return QUALITY[q] ? q : 'medio';
+  } catch {
+    return 'medio';
+  }
+}
 
 function toColor(c, fallback = '#cccccc') {
   if (Array.isArray(c)) return new THREE.Color(c[0], c[1], c[2]);
@@ -56,9 +71,8 @@ export class Renderer3D {
     hostCanvas.insertAdjacentElement('afterend', this.canvas);
 
     this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: true, powerPreference: 'high-performance' });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 0.9;
@@ -86,7 +100,7 @@ export class Renderer3D {
     this.camLook = new THREE.Vector3();
 
     // pós-processamento: brilho (bloom) nas luzes + saída com tone mapping
-    const rt = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: 4 });
+    const rt = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: 2 });
     this.composer = new EffectComposer(this.renderer, rt);
     this.composer.addPass(new RenderPass(this.scene, this.camera));
     this.bloom = new UnrealBloomPass(new THREE.Vector2(512, 512), 0.35, 0.5, 0.86);
@@ -119,11 +133,72 @@ export class Renderer3D {
     this.blockGroups = new Map();
     this.vehicleMeshes = new Map();
     this.pedMeshes = new Map();
+    this.pedPool = {};
+    this.tmpColorA = new THREE.Color();
+    this.tmpColorB = new THREE.Color();
+    this.moonDir = new THREE.Vector3(-0.3, 0.9, -0.3);
+    this.fps = { time: 0, frames: 0, lowStreak: 0 };
+    this.onQualityChange = null;
+    this.setQuality(loadQualityId(), false);
     this.extraFigures = new Map();
     this.groundBuilt = false;
     this.active = false;
     this.lastW = 0;
     this.lastH = 0;
+  }
+
+  /** Muda o nível de gráficos ('leve' | 'medio' | 'alto'). */
+  setQuality(id, save = true) {
+    const q = QUALITY[id] || QUALITY.medio;
+    this.qualityId = QUALITY[id] ? id : 'medio';
+    this.q = q;
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, q.pixelRatio));
+    if (this.renderer.shadowMap.enabled !== q.shadows) {
+      this.renderer.shadowMap.enabled = q.shadows;
+      this.scene.traverse((o) => {
+        if (!o.material) return;
+        for (const m of Array.isArray(o.material) ? o.material : [o.material]) m.needsUpdate = true;
+      });
+    }
+    this.sun.castShadow = q.shadows;
+    if (this.sun.shadow.mapSize.x !== q.shadowSize) {
+      this.sun.shadow.mapSize.set(q.shadowSize, q.shadowSize);
+      this.sun.shadow.map?.dispose();
+      this.sun.shadow.map = null;
+    }
+    this.scene.fog.near = q.fogNear;
+    this.scene.fog.far = q.fogFar;
+    for (const fig of this.pedMeshes.values()) this.#setShadows(fig, q.pedShadows);
+    this.lastW = 0; // força o redimensionamento com a nova resolução
+    this.fps.lowStreak = 0;
+    if (save) {
+      try { localStorage.setItem('gta-graficos', this.qualityId); } catch { /* sem storage */ }
+    }
+  }
+
+  #setShadows(fig, on) {
+    fig.traverse((o) => { if (o.isMesh) o.castShadow = on; });
+  }
+
+  // Mede o FPS; se ficar lento por alguns segundos, baixa a qualidade sozinho
+  #watchFps(dt) {
+    const f = this.fps;
+    f.time += dt;
+    f.frames += 1;
+    if (f.time < 2.5) return;
+    const fps = f.frames / f.time;
+    f.time = 0;
+    f.frames = 0;
+    if (fps < 32) f.lowStreak += 1;
+    else f.lowStreak = 0;
+    if (f.lowStreak >= 2) {
+      const idx = QUALITY_ORDER.indexOf(this.qualityId);
+      if (idx > 0) {
+        this.setQuality(QUALITY_ORDER[idx - 1]);
+        this.onQualityChange?.(this.qualityId, true);
+      }
+      f.lowStreak = 0;
+    }
   }
 
   setActive(on) {
@@ -210,6 +285,7 @@ export class Renderer3D {
       fire: new THREE.MeshBasicMaterial({ color: 0xff8a2a, transparent: true, opacity: 0.8, depthWrite: false }),
       lampPole: new THREE.MeshLambertMaterial({ color: 0x3a3f47 }),
       lampBulb: new THREE.MeshBasicMaterial({ color: 0xfff1c1 }),
+      parapet: new THREE.MeshStandardMaterial({ color: 0x5b5f66, roughness: 0.9 }),
       contact: new THREE.MeshBasicMaterial({
         color: 0x000000,
         transparent: true,
@@ -371,16 +447,22 @@ export class Renderer3D {
         const short = clip.name.split('|').pop().replace(/^Man_/, '');
         clips[short] = clip;
       }
+      if (name === 'woman1') {
+        splitSleeves(gltf.scene, 'White', 'Sleeve', /Arm|Wrist|Index|Middle|Ring|Pinky|Thumb/);
+        // braços (pele) do corpo viram 'ArmSkin': manga comprida para quem usa; mãos continuam pele
+        splitSleeves(gltf.scene, 'Skin', 'ArmSkin', /UpperArm|LowerArm/, /Body/i);
+      }
       people[name] = { scene: gltf.scene, clips, height: box.max.y - box.min.y, minY: box.min.y };
     }));
     this.people = people;
   }
 
   // Cria uma pessoa animada; recolor = { nomeDoMaterial: cor }
-  #makeCharacter(name, recolor = {}, height = 34) {
+  #makeCharacter(name, recolor = {}, height = 34, accessories = null) {
     const M = this.people[name];
     const root = new THREE.Group();
     const inst = cloneSkinned(M.scene);
+    if (accessories) this.#addAccessories(inst, M, accessories);
     const s = height / M.height;
     inst.scale.setScalar(s);
     inst.position.y = -M.minY * s;
@@ -410,9 +492,16 @@ export class Renderer3D {
     const mixer = new THREE.AnimationMixer(inst);
     const actions = {};
     for (const [k, clip] of Object.entries(M.clips)) actions[k] = mixer.clipAction(clip);
-    root.userData = { mixer, actions, current: null, model: name };
+    root.userData = { mixer, actions, current: null, model: name, mats: [...matCache.values()] };
     this.scene.add(root);
     return root;
+  }
+
+  #recolor(fig, recolor) {
+    for (const m of fig.userData.mats || []) {
+      const c = recolor[m.name];
+      if (c !== undefined && c !== null) m.color.copy(toColor(c));
+    }
   }
 
   #playAction(fig, name) {
@@ -434,7 +523,59 @@ export class Renderer3D {
   // Pessoa: modelo animado quando disponível, senão o boneco de blocos
   #character(kind, colors) {
     if (!this.people) return this.#buildFigure(colors.blocky);
-    return this.#makeCharacter(kind, colors.recolor, colors.height || 34);
+    return this.#makeCharacter(kind, colors.recolor, colors.height || 34, colors.accessories || null);
+  }
+
+  // Cabelo comprido, rabo de cavalo e mochila presos aos ossos (acompanham a animação)
+  #addAccessories(inst, M, acc) {
+    inst.updateMatrixWorld(true);
+    const H = M.height;
+    const head = inst.getObjectByName('Head');
+    const chest = inst.getObjectByName('Chest') || inst.getObjectByName('Torso');
+    const hp = head ? head.getWorldPosition(new THREE.Vector3()) : new THREE.Vector3(0, H * 0.9, 0);
+    const cp = chest ? chest.getWorldPosition(new THREE.Vector3()) : new THREE.Vector3(0, H * 0.7, 0);
+    const mat = (c, rough = 0.8) => new THREE.MeshStandardMaterial({ color: toColor(c), roughness: rough, metalness: 0 });
+    const put = (bone, mesh, x, y, z) => {
+      mesh.position.set(x, y, z);
+      mesh.castShadow = true;
+      inst.add(mesh);
+      if (bone) bone.attach(mesh);
+    };
+    // (o modelo olha para +Z: as costas ficam em -Z)
+    if (acc.longHair) {
+      const hm = mat(acc.longHair, 0.6);
+      hm.name = 'AccHair';
+      const back = new THREE.Mesh(new THREE.CapsuleGeometry(H * 0.07, H * 0.17, 4, 10), hm);
+      back.scale.set(1.15, 1, 0.5);
+      put(head, back, hp.x, hp.y - H * 0.07, hp.z - H * 0.045);
+      // mechas dos lados do rosto, caindo sobre os ombros
+      for (const side of [-1, 1]) {
+        const lock = new THREE.Mesh(new THREE.CapsuleGeometry(H * 0.024, H * 0.13, 4, 8), hm);
+        lock.scale.set(1, 1, 0.8);
+        put(head, lock, hp.x + side * H * 0.068, hp.y - H * 0.055, hp.z - H * 0.004);
+      }
+    }
+    if (acc.ponytail) {
+      const pm = mat(acc.ponytail, 0.6);
+      pm.name = 'AccHair';
+      const tie = new THREE.Mesh(new THREE.SphereGeometry(H * 0.03, 10, 8), pm);
+      put(head, tie, hp.x, hp.y + H * 0.035, hp.z - H * 0.07);
+      const tail = new THREE.Mesh(new THREE.CapsuleGeometry(H * 0.028, H * 0.13, 4, 8), pm);
+      tail.rotation.x = 0.25;
+      put(head, tail, hp.x, hp.y - H * 0.05, hp.z - H * 0.085);
+    }
+    if (acc.backpack) {
+      const bag = new THREE.Mesh(new THREE.BoxGeometry(H * 0.15, H * 0.19, H * 0.07), mat(acc.backpack, 0.9));
+      bag.geometry.translate(0, 0, 0);
+      put(chest, bag, cp.x, cp.y - H * 0.035, cp.z - H * 0.1);
+      const pocket = new THREE.Mesh(new THREE.BoxGeometry(H * 0.11, H * 0.07, H * 0.025), mat(acc.backpackDark || '#5b4a33', 0.9));
+      put(chest, pocket, cp.x, cp.y - H * 0.08, cp.z - H * 0.145);
+      // alças passando pelos ombros
+      for (const side of [-1, 1]) {
+        const strap = new THREE.Mesh(new THREE.BoxGeometry(H * 0.022, H * 0.17, H * 0.012), mat(acc.backpackDark || '#5b4a33', 0.9));
+        put(chest, strap, cp.x + side * H * 0.05, cp.y - H * 0.005, cp.z + H * 0.062);
+      }
+    }
   }
 
   // Material do carro: igual ao do modelo, mas a cor da carroceria vira a cor do veículo no jogo
@@ -647,8 +788,35 @@ export class Renderer3D {
 
     for (const t of blockDecor(block).trees) this.#buildTree(t, g);
 
+    this.#mergeStatic(g);
     this.scene.add(g);
     return { group: g, buildings };
+  }
+
+  // Junta as peças do quarteirão que usam o mesmo material numa malha só (muito menos chamadas de desenho)
+  #mergeStatic(g) {
+    const byMat = new Map();
+    for (const child of [...g.children]) {
+      if (!child.isMesh || Array.isArray(child.material) || child.userData.keep) continue;
+      child.updateMatrix();
+      let geo = child.geometry.clone();
+      if (geo.index) geo = geo.toNonIndexed();
+      geo.applyMatrix4(child.matrix);
+      for (const name of Object.keys(geo.attributes)) if (!['position', 'normal', 'uv'].includes(name)) geo.deleteAttribute(name);
+      if (!byMat.has(child.material)) byMat.set(child.material, { geos: [], cast: false });
+      const entry = byMat.get(child.material);
+      entry.geos.push(geo);
+      entry.cast = entry.cast || child.castShadow;
+      g.remove(child);
+    }
+    for (const [mat, { geos, cast }] of byMat) {
+      const merged = mergeGeometries(geos, false);
+      if (!merged) continue;
+      const mesh = new THREE.Mesh(merged, mat);
+      mesh.castShadow = cast;
+      mesh.receiveShadow = true;
+      g.add(mesh);
+    }
   }
 
   #buildBuilding(bd, g) {
@@ -695,7 +863,7 @@ export class Renderer3D {
 
     const extras = new THREE.Group();
     // mureta do telhado
-    const parapetMat = new THREE.MeshLambertMaterial({ color: roofCol.clone().multiplyScalar(0.7) });
+    const parapetMat = this.mat.parapet;
     const pt = 4;
     for (const [sx, sz, px, pz] of [
       [bb.w, pt, bb.x + bb.w / 2, bb.y + pt / 2],
@@ -707,7 +875,7 @@ export class Renderer3D {
       p.scale.set(sx, 5, sz);
       p.position.set(px, H + 3 + 2.5, pz);
       p.castShadow = true;
-      extras.add(p);
+      g.add(p);
     }
     // ar-condicionado no telhado
     if (bb.w > 70 && bb.h > 60) {
@@ -715,7 +883,7 @@ export class Renderer3D {
       ac.scale.set(16, 9, 12);
       ac.position.set(bb.x + bb.w * 0.25, H + 3 + 4.5, bb.y + bb.h * 0.3);
       ac.castShadow = true;
-      extras.add(ac);
+      g.add(ac);
     }
     // porta e toldo na entrada
     if (bd.doormat) {
@@ -740,10 +908,10 @@ export class Renderer3D {
         z + (bd.doorSide === 'south' ? off : bd.doorSide === 'north' ? -off : 0),
       );
       awn.castShadow = true;
-      extras.add(door, awn);
+      g.add(door, awn);
     }
     g.add(extras);
-    const mats = [wx, wz, roofMat, parapetMat];
+    const mats = [wx, wz, roofMat];
     for (const m of mats) m.transparent = true;
     return { code: bd.code, mesh, extras, roofMat, walls: [wx, wz], mats, bounds: bb, faded: false };
   }
@@ -1021,8 +1189,15 @@ export class Renderer3D {
       for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
       const kind = models[h % models.length];
       const shirtMat = { man: 'Shirt', hoodie: 'Purple', punk: 'Red', woman1: 'White', woman2: 'Red' }[kind];
-      const recolor = { [shirtMat]: ped.color, Skin: ped.skinColor || null, Pants: ped.pantsColor || null, Hair: ped.hairColor || null };
-      fig = this.#character(kind, { blocky, recolor, height: 31 + (h % 5) });
+      const recolor = { [shirtMat]: ped.color, Sleeve: ped.color, Skin: ped.skinColor || null, ArmSkin: ped.skinColor || null, Pants: ped.pantsColor || null, Hair: ped.hairColor || null };
+      const pooled = this.people ? this.pedPool[kind]?.pop() : null;
+      if (pooled) {
+        fig = pooled;
+        this.#recolor(fig, recolor);
+      } else {
+        fig = this.#character(kind, { blocky, recolor, height: 31 + (h % 5) });
+        this.#setShadows(fig, this.q.pedShadows);
+      }
       this.pedMeshes.set(ped.id, fig);
     }
     fig.userData.seen = this.frameId;
@@ -1044,11 +1219,17 @@ export class Renderer3D {
     const focus = playerVehicle || player;
 
     // --- cidade ao redor ---
-    const blocks = cityMap.getVisibleBlocks(focus.x - BLOCK_RADIUS, focus.y - BLOCK_RADIUS, focus.x + BLOCK_RADIUS, focus.y + BLOCK_RADIUS);
+    const R = this.q.radius;
+    const blocks = cityMap.getVisibleBlocks(focus.x - R, focus.y - R, focus.x + R, focus.y + R);
     const seen = new Set();
-    for (const block of blocks) {
+    // monta primeiro os quarteirões mais perto; no máximo 2 novos por quadro (evita travadas)
+    const dist = (b) => Math.hypot(b.bounds.x + b.bounds.w / 2 - focus.x, b.bounds.y + b.bounds.h / 2 - focus.y);
+    let budget = this.blockGroups.size === 0 ? Infinity : 2;
+    for (const block of [...blocks].sort((a, b) => dist(a) - dist(b))) {
       let entry = this.blockGroups.get(block);
       if (!entry) {
+        if (budget <= 0) continue;
+        budget -= 1;
         entry = this.#buildBlock(block, cityMap);
         this.blockGroups.set(block, entry);
       }
@@ -1068,14 +1249,16 @@ export class Renderer3D {
     this.sunDir.set(Math.cos(az) * Math.cos(Math.asin(Math.max(-1, Math.min(1, elev)))), elev, -0.45).normalize();
     this.sky.material.uniforms.sunPosition.value.copy(this.sunDir);
     this.sky.position.copy(this.camera.position);
-    const horizon = new THREE.Color(0xc9ddef).lerp(new THREE.Color(0xf2a46b), sky.golden * 0.6).lerp(new THREE.Color(0x0b1226), Math.min(1, dark * 1.1));
+    const horizon = this.tmpColorA.set(0xc9ddef).lerp(this.tmpColorB.set(0xf2a46b), sky.golden * 0.6);
+    horizon.lerp(this.tmpColorB.set(0x0b1226), Math.min(1, dark * 1.1));
     this.scene.fog.color.copy(horizon);
-    this.scene.background = horizon;
+    if (!(this.scene.background instanceof THREE.Color)) this.scene.background = new THREE.Color();
+    this.scene.background.copy(horizon);
     this.scene.environmentIntensity = 0.38 - dark * 0.3;
     this.hemi.intensity = 0.62 - dark * 0.45;
     this.sun.intensity = 2.4 * (1 - dark) + 0.08;
     this.sun.color.set(sky.golden > 0.2 ? 0xffc08a : 0xfff4e0);
-    const lightDir = elev > 0.08 ? this.sunDir : new THREE.Vector3(-0.3, 0.9, -0.3); // à noite: luar de cima
+    const lightDir = elev > 0.08 ? this.sunDir : this.moonDir; // à noite: luar de cima
     this.sun.position.set(focus.x + lightDir.x * 900, Math.max(260, lightDir.y * 900), focus.y + lightDir.z * 900);
     this.sun.target.position.set(focus.x, 0, focus.y);
     this.bloom.strength = 0.08 + dark * 0.85;
@@ -1106,7 +1289,7 @@ export class Renderer3D {
     // --- veículos ---
     const vSeen = new Set();
     for (const v of vehicles) {
-      if (Math.abs(v.x - focus.x) > BLOCK_RADIUS || Math.abs(v.y - focus.y) > BLOCK_RADIUS) continue;
+      if (Math.abs(v.x - focus.x) > R || Math.abs(v.y - focus.y) > R) continue;
       let mesh = this.vehicleMeshes.get(v.id);
       if (mesh && (mesh.userData.tex !== (v.texModel || '') || mesh.userData.police !== Boolean(v.police))) {
         this.scene.remove(mesh);
@@ -1123,8 +1306,12 @@ export class Renderer3D {
       mesh.position.set(v.x, v.sinking ? -8 * (v.sinkProgress || 0) : 0, v.y);
       mesh.rotation.y = -v.angle;
       const paint = mesh.userData.paint;
-      if (v.destroyed) paint.color.set(0x2a2a2a);
-      else if (!v.police) paint.color.copy(toColor(v.color));
+      const colorKey = v.destroyed ? 'x' : v.color;
+      if (mesh.userData.colorKey !== colorKey) {
+        mesh.userData.colorKey = colorKey;
+        if (v.destroyed) paint.color.set(0x2a2a2a);
+        else if (!v.police) paint.color.copy(toColor(v.color));
+      }
       if (mesh.userData.dim) mesh.userData.dim.value = v.destroyed ? 0.25 : 1;
       // rodas girando conforme a distância percorrida
       if (mesh.userData.wheels?.length) {
@@ -1146,9 +1333,14 @@ export class Renderer3D {
     }
 
     // --- pedestres ---
+    const near = [];
     for (const ped of pedestrians) {
-      if (Math.abs(ped.x - focus.x) > 1100 || Math.abs(ped.y - focus.y) > 1100) continue;
       if (ped.state === 'inside') continue;
+      const d = Math.abs(ped.x - focus.x) + Math.abs(ped.y - focus.y);
+      if (d < 1300) near.push([d, ped]);
+    }
+    near.sort((a, b) => a[0] - b[0]);
+    for (const [, ped] of near.slice(0, this.q.peds)) {
       const fig = this.#pedFigure(ped);
       fig.visible = true;
       const down = (ped.health ?? 1) <= 0;
@@ -1157,7 +1349,10 @@ export class Renderer3D {
     }
     for (const [id, fig] of this.pedMeshes) {
       if (fig.userData.seen !== this.frameId) {
-        this.scene.remove(fig);
+        // volta para a reserva em vez de ser destruído
+        fig.visible = false;
+        const kind = fig.userData.model || 'blocky';
+        (this.pedPool[kind] ||= []).push(fig);
         this.pedMeshes.delete(id);
       }
     }
@@ -1168,7 +1363,8 @@ export class Renderer3D {
       this.playerFig = this.#character('woman1', {
         blocky: { shirt: c.shirt || '#1e1e23', sleeve: c.sleeve, pants: c.pants || '#1e1e23', skin: c.skin || '#f3cda6', hair: '#6b3f22', longHair: true, shoes: c.shoes || '#f3f2ee' },
         // Ana Laura: camiseta preta, calça escura, tênis claro, cabelo castanho comprido
-        recolor: { White: c.shirt || '#1e1e23', Grey: '#2a2a31', Brown: c.shoes || '#f3f2ee', Orange: c.pants || '#1e1e23', Skin: c.skin || '#f3cda6', Hair_Brown: '#6b3f22', Hair_Blond: '#6b3f22' },
+        recolor: { White: '#17171b', Sleeve: c.sleeve || '#ededea', ArmSkin: c.sleeve || '#ededea', Grey: c.shoes || '#f3f2ee', Orange: c.pants || '#1e1e23', Skin: c.skin || '#f3cda6', Hair_Brown: '#5a3219', Hair_Blond: '#7a4a28' },
+        accessories: { longHair: '#5e3519', backpack: '#7d6b4f', backpackDark: '#4f4232' },
         height: 34,
       });
     }
@@ -1185,10 +1381,11 @@ export class Renderer3D {
     if (partner && partner.visible !== false && partner.state !== 'unplaced') {
       if (!this.partnerFig) {
         const c = p.partnerColors || {};
-        this.partnerFig = this.#character('woman2', {
+        this.partnerFig = this.#character('woman1', {
           blocky: { shirt: c.shirt || '#2c6a43', sleeve: c.sleeve, pants: c.pants || '#1e1e23', skin: c.skin || '#f3cda6', hair: '#3a2416', longHair: true, shoes: c.shoes || '#3a3a42' },
           // Camila: jaqueta verde, calça escura
-          recolor: { Red: '#3a2416', LimeGreen: c.sleeve || '#2c6a43', Skin: c.skin || '#f3cda6' },
+          recolor: { White: c.sleeve || '#2c6a43', Sleeve: c.sleeve || '#2c6a43', ArmSkin: c.sleeve || '#2c6a43', Orange: c.pants || '#1e1e23', Grey: c.shoes || '#3a3a42', Skin: c.skin || '#f3cda6', Hair_Brown: '#3a2416', Hair_Blond: '#4a2e1b' },
+          accessories: { ponytail: '#3a2416' },
           height: 34,
         });
       }
@@ -1313,7 +1510,9 @@ export class Renderer3D {
 
     // --- câmera ---
     this.#updateCamera(player, playerVehicle, dt);
-    this.composer.render();
+    if (this.q.bloom) this.composer.render();
+    else this.renderer.render(this.scene, this.camera);
+    this.#watchFps(dt);
   }
 
   #updateCamera(player, vehicle, dt) {
@@ -1419,4 +1618,42 @@ function segmentHitsRect(x0, y0, x1, y1, r, pad = 0) {
     return true;
   };
   return clip(-dx, x0 - minX) && clip(dx, maxX - x0) && clip(-dy, y0 - minY) && clip(dy, maxY - y0) && t0 <= t1;
+}
+
+// Divide a malha da camisa em tronco e mangas (pelos ossos dos braços) — cria o material 'Sleeve'
+function splitSleeves(root, matName, newName, boneRe, meshRe = null) {
+  root.traverse((o) => {
+    if (!o.isSkinnedMesh || Array.isArray(o.material) || o.material.name !== matName) return;
+    if (meshRe && !meshRe.test(o.name) && !meshRe.test(o.parent?.name || '')) return;
+    const geo = o.geometry;
+    const bones = o.skeleton.bones;
+    const si = geo.attributes.skinIndex;
+    const sw = geo.attributes.skinWeight;
+    const isArm = (v) => {
+      let best = 0;
+      let bestW = -1;
+      for (let k = 0; k < 4; k++) {
+        const w = sw.getComponent(v, k);
+        if (w > bestW) { bestW = w; best = si.getComponent(v, k); }
+      }
+      return boneRe.test(bones[best]?.name || '');
+    };
+    const index = geo.index ? Array.from(geo.index.array) : [...Array(geo.attributes.position.count).keys()];
+    const torso = [];
+    const arms = [];
+    for (let t = 0; t < index.length; t += 3) {
+      const a = index[t];
+      const b = index[t + 1];
+      const c = index[t + 2];
+      const n = (isArm(a) ? 1 : 0) + (isArm(b) ? 1 : 0) + (isArm(c) ? 1 : 0);
+      (n >= 2 ? arms : torso).push(a, b, c);
+    }
+    geo.setIndex([...torso, ...arms]);
+    geo.clearGroups();
+    geo.addGroup(0, torso.length, 0);
+    geo.addGroup(torso.length, arms.length, 1);
+    const sleeve = o.material.clone();
+    sleeve.name = newName;
+    o.material = [o.material, sleeve];
+  });
 }

@@ -84,6 +84,12 @@ export class Engine {
       if (btn) this.setViewMode(btn.dataset.view);
     };
     document.querySelector('[data-view-picker]')?.addEventListener('click', this.onViewPicker);
+    this.onQualityPicker = (ev) => {
+      const btn = ev.target.closest('[data-quality]');
+      if (btn) this.setGraphicsQuality(btn.dataset.quality);
+    };
+    document.querySelector('[data-quality-picker]')?.addEventListener('click', this.onQualityPicker);
+    this.#syncQualityPicker();
     this.minimap = new Minimap(minimapCanvas);
     this.input = new InputManager(touchControlsEl);
 
@@ -301,6 +307,7 @@ export class Engine {
     if (this.onDifficultyEvent) window.removeEventListener('gta-difficulty', this.onDifficultyEvent);
     document.getElementById('camera-button')?.removeEventListener('click', this.onCameraButton);
     document.querySelector('[data-view-picker]')?.removeEventListener('click', this.onViewPicker);
+    document.querySelector('[data-quality-picker]')?.removeEventListener('click', this.onQualityPicker);
     if (this.#onResize) window.removeEventListener('resize', this.#onResize);
     if (this.#onPageHide) window.removeEventListener('pagehide', this.#onPageHide);
     if (this.#onVisibilityChange) document.removeEventListener('visibilitychange', this.#onVisibilityChange);
@@ -874,6 +881,24 @@ export class Engine {
     this.routePoints = this.pathfinder.findRoute(this.player.x, this.player.y, this.objectiveCode);
   }
 
+  /** Gráficos do 3D: 'leve', 'medio' ou 'alto'. */
+  setGraphicsQuality(id) {
+    try { localStorage.setItem('gta-graficos', id); } catch { /* sem storage */ }
+    this.renderer3d?.setQuality(id);
+    this.#syncQualityPicker();
+    const nome = { leve: 'Leve', medio: 'Médio', alto: 'Alto' }[id] || id;
+    this.hud.showToast(`Gráficos 3D: ${nome}`, 1800);
+  }
+
+  #syncQualityPicker() {
+    let id = 'medio';
+    try { id = localStorage.getItem('gta-graficos') || 'medio'; } catch { /* sem storage */ }
+    if (this.renderer3d) id = this.renderer3d.qualityId;
+    for (const b of document.querySelectorAll('[data-quality-picker] [data-quality]')) {
+      b.classList.toggle('active', b.dataset.quality === id);
+    }
+  }
+
   /** Muda a câmera: '2d', '25d' ou '3d'. */
   setViewMode(mode) {
     if (!['2d', '25d', '3d'].includes(mode)) return;
@@ -892,11 +917,19 @@ export class Engine {
     this.renderer.view3d = this.viewMode === '25d';
     const want3d = this.viewMode === '3d';
     if (want3d && !this.renderer3d && !this.loading3d) {
-      this.loading3d = import('../render/three-renderer.js?v=15')
+      this.loading3d = import('../render/three-renderer.js?v=18')
         .then(async ({ Renderer3D }) => {
           const r3 = new Renderer3D(this.canvasEl || this.renderer.canvas, this.renderer.dayCycle);
           await r3.ready;
+          r3.onQualityChange = (id, auto) => {
+            this.#syncQualityPicker();
+            if (auto) {
+              const nome = { leve: 'Leve', medio: 'Médio', alto: 'Alto' }[id] || id;
+              this.hud.showToast(`O jogo estava lento: gráficos 3D ajustados para ${nome} (mude no menu P)`, 4000);
+            }
+          };
           this.renderer3d = r3;
+          this.#syncQualityPicker();
           this.renderer3d.setActive(this.viewMode === '3d');
         })
         .catch((err) => {

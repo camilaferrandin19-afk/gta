@@ -323,6 +323,14 @@
             <button type="button" data-view="3d">3D</button>
           </div>
         </div>
+        <div class="difficulty-picker view-picker" data-quality-picker>
+          <span class="difficulty-label">Gráficos 3D</span>
+          <div class="difficulty-options" role="radiogroup" aria-label="Gráficos 3D">
+            <button type="button" data-quality="leve">Leve</button>
+            <button type="button" data-quality="medio">Médio</button>
+            <button type="button" data-quality="alto">Alto</button>
+          </div>
+        </div>
         <div class="pause-actions">
           <button id="pause-resume-btn" type="button" class="primary-button">CONTINUAR</button>
           <button id="pause-restart-btn" type="button" class="secondary-button">REINICIAR MISSÃO</button>
@@ -476,6 +484,6 @@
     })();
   </script>
   <script type="importmap">{ "imports": { "three": "./vendor/three/three.module.min.js", "three/addons/": "./vendor/three/addons/" } }</script>
-  <script type="module" src="./src/main.js?v=118"></script>
+  <script type="module" src="./src/main.js?v=121"></script>
 </body>
 </html>
