@@ -413,7 +413,8 @@ export class TrafficManager {
         }
       }
 
-      const targetSpeed = ped.state === 'fleeing' ? 158 : (ped.baseSpeed || 46);
+      // na calçada caminha com calma; na faixa apressa o passo (como na vida real)
+      const targetSpeed = ped.state === 'fleeing' ? 158 : ped.state === 'crossing' ? 62 : (ped.baseSpeed || 46);
       ped.speed += (targetSpeed - ped.speed) * Math.min(1, dt * (ped.state === 'fleeing' ? 7 : 4));
 
       const nextX = ped.x + ped.dirX * ped.speed * dt;
