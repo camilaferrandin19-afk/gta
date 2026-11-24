@@ -3,7 +3,7 @@ import { RoadPathfinder } from '../world/pathfinding.js';
 import { TrafficManager } from '../world/traffic-manager.js?v=24';
 import { BoatManager } from '../world/boat-manager.js?v=17';
 import { InputManager } from '../input/input-manager.js?v=21';
-import { WebGLRenderer } from '../render/webgl-renderer.js?v=50';
+import { WebGLRenderer } from '../render/webgl-renderer.js?v=51';
 import { isInWater, resolveCircleStaticObstacle, resolveEntityCollisions, resolveVehiclePairCollision } from '../physics/collision.js?v=11';
 import {
   applyPedestrianDamage,
@@ -67,6 +67,15 @@ export class Engine {
     this.canvas = canvas;
     this.hud = hud;
     this.renderer = new WebGLRenderer(canvas);
+    // Visão: '2d' (de cima), '25d' (prédios com altura) ou '3d' (3D completo, câmera atrás)
+    this.viewMode = '25d';
+    try {
+      const saved = localStorage.getItem('gta-visao');
+      if (saved === '2d' || saved === '25d' || saved === '3d') this.viewMode = saved;
+      else if (localStorage.getItem('gta-visao-3d') === '0') this.viewMode = '2d';
+    } catch { /* sem storage */ }
+    this.renderer3d = null;
+    this.#applyViewMode(false);
     this.minimap = new Minimap(minimapCanvas);
     this.input = new InputManager(touchControlsEl);
 
@@ -210,10 +219,11 @@ export class Engine {
         } else if (e.code === 'KeyR') {
           startReload(this.weapons.arsenal);
         } else if (e.code === 'KeyV' && !e.repeat) {
-          // Troca a visão: 2D (de cima) ou 2.5D (prédios em 3D)
-          this.renderer.view3d = !this.renderer.view3d;
-          try { localStorage.setItem('gta-visao-3d', this.renderer.view3d ? '1' : '0'); } catch { /* sem storage */ }
-          this.hud.showToast(this.renderer.view3d ? 'Visão 3D (prédios com altura) · V troca' : 'Visão 2D (de cima) · V troca', 2200);
+          // Troca a visão: 2D → 2.5D → 3D completo → 2D
+          const next = { '2d': '25d', '25d': '3d', '3d': '2d' };
+          this.viewMode = next[this.viewMode] || '25d';
+          try { localStorage.setItem('gta-visao', this.viewMode); } catch { /* sem storage */ }
+          this.#applyViewMode(true);
         }
       }
       if (e.key === 'i' || e.key === 'I' || e.key === 'Tab') {
@@ -857,7 +867,47 @@ export class Engine {
     this.routePoints = this.pathfinder.findRoute(this.player.x, this.player.y, this.objectiveCode);
   }
 
-  #worldToScreen(worldX, worldY) {
+  #applyViewMode(announce) {
+    this.renderer.view3d = this.viewMode === '25d';
+    const want3d = this.viewMode === '3d';
+    if (want3d && !this.renderer3d && !this.loading3d) {
+      this.loading3d = import('../render/three-renderer.js?v=4')
+        .then(({ Renderer3D }) => {
+          this.renderer3d = new Renderer3D(this.canvasEl || this.renderer.canvas, this.renderer.dayCycle);
+          this.renderer3d.setActive(this.viewMode === '3d');
+        })
+        .catch((err) => {
+          console.error('[3D] Falha ao carregar a visão 3D:', err);
+          this.hud.showToast('Não foi possível abrir a visão 3D neste computador.', 3500);
+          this.viewMode = '25d';
+          this.renderer.view3d = true;
+        })
+        .finally(() => { this.loading3d = null; });
+    }
+    this.renderer3d?.setActive(want3d);
+    if (announce) {
+      const msg = { '2d': 'Visão 2D (de cima)', '25d': 'Visão 2.5D (prédios com altura)', '3d': 'Visão 3D (câmera atrás)' }[this.viewMode];
+      this.hud.showToast(`${msg} · V troca`, 2200);
+    }
+  }
+
+  #is3dActive() {
+    return this.viewMode === '3d' && Boolean(this.renderer3d);
+  }
+
+  #characterColors(id) {
+    const c = this.storyPackage?.characters?.get?.(id);
+    if (!c) return {};
+    const sleeve = c.sleeveColor || null;
+    // camiseta: a protagonista usa camiseta escura com manga longa; quem não tem cor própria usa a manga
+    const shirt = id === this.storyPackage?.protagonist ? (c.pantsColor || '#1e1e23') : (sleeve || '#2c6a43');
+    return { shirt, sleeve, pants: c.pantsColor, skin: c.skinColor, shoes: c.shoeColor };
+  }
+
+  // lift: quanto acima do ponto (em 2D vira deslocamento para cima na tela; em 3D, altura)
+  #worldToScreen(worldX, worldY0, lift = 0) {
+    if (this.#is3dActive()) return this.renderer3d.worldToScreen(worldX, worldY0, 16 + lift * 0.6);
+    const worldY = worldY0 - lift;
     const zoom = this.renderer?.zoom || 1;
     const viewW = this.renderer?.viewWidth || (typeof window !== 'undefined' ? window.innerWidth : 800);
     const viewH = this.renderer?.viewHeight || (typeof window !== 'undefined' ? window.innerHeight : 600);
@@ -1620,7 +1670,7 @@ export class Engine {
               ped.angle = Math.atan2(this.player.y - ped.y, this.player.x - ped.x);
               const pool = this.storyPackage?.npcLines?.length ? this.storyPackage.npcLines : PEDESTRIAN_CHAT_LINES;
               const line = pool[Math.floor(Math.random() * pool.length)];
-              const initPos = this.#worldToScreen(ped.x, ped.y - 22);
+              const initPos = this.#worldToScreen(ped.x, ped.y, 22);
               this.hud.showNpcSpeechBubble(ped, line, initPos);
             }
           }
@@ -2281,6 +2331,10 @@ export class Engine {
   }
 
   #screenToWorld(sx, sy) {
+    if (this.#is3dActive()) {
+      const hit = this.renderer3d.screenToWorld(sx, sy);
+      if (hit) return hit;
+    }
     const zoom = this.renderer?.zoom || 1;
     const viewW = this.renderer?.viewWidth || window.innerWidth;
     const viewH = this.renderer?.viewHeight || window.innerHeight;
@@ -3010,7 +3064,7 @@ export class Engine {
     if (!line) return;
     this.partnerChatCooldown = 7;
     this.partnerIdleTimer = 0;
-    const pos = this.#worldToScreen(p.x, p.y - 22);
+    const pos = this.#worldToScreen(p.x, p.y, 22);
     this.hud.showNpcSpeechBubble(p, line, pos);
   }
 
@@ -3052,14 +3106,14 @@ export class Engine {
   #updatePartnerNameplate() {
     const p = this.partner;
     if (!p || !p.visible || p.state === 'riding') return;
-    const pos = this.#worldToScreen(p.x, p.y - 32);
+    const pos = this.#worldToScreen(p.x, p.y, 32);
     this.pendingPartnerNameplate = { text: p.name, x: pos.x, y: pos.y };
   }
 
   #updateNameplate(currentVehicle) {
     if (!this.protagonistName || this.player.isDead || this.player.sinking?.active) return;
     const lift = currentVehicle ? Math.max(currentVehicle.length, currentVehicle.width) * 0.5 + 14 : 34;
-    const pos = this.#worldToScreen(this.player.x, this.player.y - lift);
+    const pos = this.#worldToScreen(this.player.x, this.player.y, lift);
     this.pendingNameplate = { text: this.protagonistName, x: pos.x, y: pos.y };
   }
 
@@ -3108,7 +3162,7 @@ export class Engine {
         const d = Math.hypot(currentVehicle.x - garage.point.x, currentVehicle.y - garage.point.y);
         if (d > 130) this.garageArmed = true;
         if (d < 85) {
-          const pos = this.#worldToScreen(garage.point.x, garage.point.y - 40);
+          const pos = this.#worldToScreen(garage.point.x, garage.point.y, 40);
           this.pendingContextPrompt = { keys: [], text: '🔧 Pare aqui para entrar na Oficina', x: pos.x, y: pos.y };
           if (this.garageArmed && Math.abs(currentVehicle.speed || 0) < 18) {
             this.garageArmed = false;
@@ -3127,7 +3181,7 @@ export class Engine {
       }
       // Parada: lembra como sair do veículo
       if (!this.pendingContextPrompt && !busy && Math.abs(currentVehicle.speed || 0) < 15) {
-        const pos = this.#worldToScreen(currentVehicle.x, currentVehicle.y - 46);
+        const pos = this.#worldToScreen(currentVehicle.x, currentVehicle.y, 46);
         const texto = currentVehicle.kind === 'moto' ? 'Descer da moto' : 'Sair do veículo';
         this.pendingContextPrompt = { keys: ['F'], text: texto, x: pos.x, y: pos.y };
       }
@@ -3137,7 +3191,7 @@ export class Engine {
 
     const gunShop = this.#nearShop('gun', 50);
     if (gunShop) {
-      const pos = this.#worldToScreen(gunShop.point.x, gunShop.point.y - 30);
+      const pos = this.#worldToScreen(gunShop.point.x, gunShop.point.y, 30);
       this.pendingContextPrompt = { keys: ['F', 'Espaço'], text: 'Entrar na Loja de Armas', x: pos.x, y: pos.y };
       return;
     }
@@ -3146,7 +3200,7 @@ export class Engine {
     if (!nearest) return;
     const nome = nearest.kind === 'moto' ? 'Subir na moto' : nearest.kind === 'van' ? 'Entrar na van' : 'Entrar no carro';
     const acao = nearest.driver === 'npc' ? `${nome} (tomar do motorista)` : nome;
-    const pos = this.#worldToScreen(nearest.x, nearest.y - Math.max(nearest.length, nearest.width) * 0.5 - 6);
+    const pos = this.#worldToScreen(nearest.x, nearest.y, Math.max(nearest.length, nearest.width) * 0.5 + 6);
     this.pendingContextPrompt = { keys: ['F', 'Espaço'], text: acao, x: pos.x, y: pos.y };
   }
 
@@ -3336,7 +3390,29 @@ export class Engine {
     const extraNpcs = pendingTargetNpc
       ? [...this.completedNpcPoints, ...this.encounterNpcs, pendingTargetNpc]
       : [...this.completedNpcPoints, ...this.encounterNpcs];
-    this.renderer.renderFrame({
+    if (this.#is3dActive()) {
+      const now = performance.now();
+      const dt3 = Math.min(0.1, (now - (this.last3dFrame || now)) / 1000) || 1 / 60;
+      this.last3dFrame = now;
+      this.renderer3d.render({
+        cityMap: this.cityMap,
+        vehicles: this.vehicles,
+        pedestrians: this.trafficManager ? this.trafficManager.pedestrians : [],
+        player: this.player,
+        partner: this.partner,
+        bullets: this.policeBullets?.length ? [...this.bullets, ...this.policeBullets] : this.bullets,
+        explosions: this.explosions,
+        worldCollectibles: this.worldCollectibles,
+        objectivePoint: hideTargetNpc ? null : this.objectivePoint,
+        gpsPoint: this.freeRoamMode || this.missionOutTriggered ? null : this.objectivePoint,
+        objectiveNpcPoint: hideTargetNpc ? null : this.objectiveNpcPoint,
+        completedNpcPoints: extraNpcs,
+        protagonistColors: this.#characterColors(this.storyPackage?.protagonist),
+        partnerColors: this.#characterColors(this.storyPackage?.partner),
+        time: this.elapsedTime,
+        dt: dt3,
+      });
+    } else this.renderer.renderFrame({
       camera: renderCam,
       cityMap: this.cityMap,
       vehicles: this.vehicles,
@@ -3395,7 +3471,7 @@ export class Engine {
       const avoidX = closeBelowPlayer
         ? (bubblePed.x >= this.player.x ? 34 : -34)
         : 0;
-      return this.#worldToScreen(bubblePed.x + avoidX, bubblePed.y - 22);
+      return this.#worldToScreen(bubblePed.x + avoidX, bubblePed.y, 22);
     });
     this.minimap.render(
       this.cityMap,

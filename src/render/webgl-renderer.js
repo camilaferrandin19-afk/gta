@@ -1770,7 +1770,7 @@ function vehicleUv(v) {
 // Árvores e arbustos de cada quarteirão (posição fixa, calculada uma vez)
 const decorCache = new WeakMap();
 const TREE_UVS = ['tree1', 'tree2', 'tree1', 'tree2', 'tree3'];
-function blockDecor(block) {
+export function blockDecor(block) {
   let decor = decorCache.get(block);
   if (decor) return decor;
   const b = block.bounds;
@@ -1831,12 +1831,12 @@ function blockDecor(block) {
 
 // ---- Altura dos prédios na visão 2.5D ----
 const CAMERA_HEIGHT = 470;
-function hash2(a, b) {
+export function hash2(a, b) {
   let h = (Math.round(a) * 374761393 + Math.round(b) * 668265263) >>> 0;
   h = Math.imul(h ^ (h >>> 13), 1274126177) >>> 0;
   return (h ^ (h >>> 16)) / 4294967296;
 }
-function buildingHeight(roof) {
+export function buildingHeight(roof) {
   const r = hash2(roof.x, roof.y);
   if (roof.isHospital || roof.type === 'hospital') return 120;
   if (roof.type === 'house') return 40 + Math.round(r * 2) * 24; // 1 a 3 andares
